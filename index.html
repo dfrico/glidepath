@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expense budget</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Expense budget</div>
+    <div class="range muted" id="range"></div>
+    <div class="actions">
+      <button id="importBtn" class="btn">Import CSV</button>
+      <button id="clearBtn" class="btn ghost">Clear data</button>
+    </div>
+    <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden>
+  </header>
+
+  <nav class="tabs" id="tabs" hidden>
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="transactions">Transactions</button>
+  </nav>
+
+  <main>
+    <section id="empty" class="empty">
+      <div id="dropzone" class="dropzone">
+        <p class="dz-title">Drop your bank CSV here</p>
+        <p class="muted">or click to choose a file. Your data stays in this browser. Nothing is uploaded.</p>
+      </div>
+    </section>
+    <section id="dashboard" class="panel" hidden></section>
+    <section id="transactions" class="panel" hidden></section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

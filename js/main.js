@@ -1,0 +1,234 @@
+// Wires everything together: import, state, tagging, and the two panels.
+
+import * as store from './store.js';
+import { parseCsv } from './parse.js';
+import { applyRules, autoTagAll, makeRuleFromTx } from './tagging.js';
+import { computeBudget, monthKey } from './budget.js';
+import { renderDashboard } from './dashboard.js';
+import { renderTransactions } from './transactions.js';
+
+const state = {
+  transactions: store.loadTransactions(),
+  rules: store.loadRules(),
+  catSettings: store.loadCategorySettings(),
+  settings: store.loadSettings(),
+  filters: { q: '', month: '', category: '', untaggedOnly: false },
+};
+
+const dom = {
+  empty: document.getElementById('empty'),
+  dashboard: document.getElementById('dashboard'),
+  transactions: document.getElementById('transactions'),
+  tabs: document.getElementById('tabs'),
+  range: document.getElementById('range'),
+  fileInput: document.getElementById('fileInput'),
+  dropzone: document.getElementById('dropzone'),
+};
+
+// ---- Import ---------------------------------------------------------------
+
+function readFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => importText(String(reader.result));
+  reader.readAsText(file);
+}
+
+function importText(text) {
+  const { rows, error } = parseCsv(text);
+  if (error) { alert(error); return; }
+  if (!rows.length) { alert('No usable rows found in that file.'); return; }
+  const added = mergeRows(rows);
+  store.saveTransactions(state.transactions);
+  renderAll();
+  alert(`Imported ${rows.length} rows. ${added} new, ${rows.length - added} already known.`);
+}
+
+// Keep tags across re-imports. Duplicates within one file are kept separately.
+function mergeRows(rows) {
+  const preexisting = new Set(state.transactions.map((t) => t.id));
+  const used = new Set(preexisting);
+  let added = 0;
+  for (const r of rows) {
+    if (preexisting.has(r.id)) continue;
+    let id = r.id;
+    let k = 1;
+    while (used.has(id)) id = r.id + '#' + (++k);
+    r.id = id;
+    used.add(id);
+    r.category = applyRules(r, state.rules);
+    r.manual = false;
+    state.transactions.push(r);
+    added++;
+  }
+  return added;
+}
+
+// ---- Tagging --------------------------------------------------------------
+
+function onTag(id, category) {
+  const t = state.transactions.find((x) => x.id === id);
+  if (!t) return;
+  if (category === '') {
+    // reverted to auto: let the rules decide again
+    t.manual = false;
+    t.category = applyRules(t, state.rules);
+  } else {
+    t.category = category;
+    t.manual = true;
+    if (state.settings.learn) {
+      upsertRule(t, category);
+      const partner = (t.partnerName || '').toUpperCase();
+      for (const o of state.transactions) {
+        if (o.manual || o.category) continue;
+        if ((o.partnerName || '').toUpperCase() === partner) o.category = category;
+      }
+    }
+  }
+  store.saveTransactions(state.transactions);
+  store.saveRules(state.rules);
+  renderAll();
+}
+
+function upsertRule(t, category) {
+  const key = (t.partnerName || '').toUpperCase().trim();
+  if (!key) return;
+  const existing = state.rules.find((r) => r.field === 'partnerName' && r.contains === key);
+  if (existing) existing.category = category;
+  else state.rules.unshift(makeRuleFromTx(t, category));
+}
+
+// ---- Settings callbacks ---------------------------------------------------
+
+function updateCat(name, patch) {
+  state.catSettings[name] = { ...state.catSettings[name], ...patch };
+  store.saveCategorySettings(state.catSettings);
+  renderDashboardPanel();
+}
+
+function updateSettings(patch) {
+  state.settings = { ...state.settings, ...patch };
+  store.saveSettings(state.settings);
+}
+
+const dashCb = {
+  onEssential: (name, v) => updateCat(name, { essential: v }),
+  onAnnual: (name, v) => updateCat(name, { annual: v }),
+  onOverride: (name, v) => updateCat(name, { budgetOverride: v }),
+  onCash: (v) => { updateSettings({ cash: v }); renderDashboardPanel(); },
+  onMonthInclude: (m, include) => {
+    const set = new Set(state.settings.excludedMonths);
+    if (include) set.delete(m); else set.add(m);
+    updateSettings({ excludedMonths: [...set] });
+    renderDashboardPanel();
+  },
+  gotoUntagged: () => {
+    state.filters.untaggedOnly = true;
+    showTab('transactions');
+  },
+};
+
+const txCb = {
+  onTag,
+  onLearn: (v) => updateSettings({ learn: v }),
+  onRetag: () => {
+    autoTagAll(state.transactions, state.rules);
+    store.saveTransactions(state.transactions);
+    renderAll();
+  },
+  onExport: exportCsv,
+};
+
+// ---- Export ---------------------------------------------------------------
+
+function exportCsv() {
+  const cols = ['Booking Date', 'Partner Name', 'Payment Reference', 'Amount (EUR)', 'Category'];
+  const lines = [cols.join('\t')];
+  for (const t of state.transactions) {
+    lines.push([t.bookingDate, t.partnerName, t.reference, t.amount, t.category || ''].map(cell).join('\t'));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'expenses-tagged.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function cell(v) {
+  const s = v == null ? '' : String(v);
+  return /[\t"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// ---- Rendering ------------------------------------------------------------
+
+function renderDashboardPanel() {
+  const budget = computeBudget(state.transactions, state.catSettings, state.settings);
+  renderDashboard(dom.dashboard, budget, state.settings, dashCb);
+}
+
+function renderTransactionsPanel() {
+  renderTransactions(dom.transactions, state.transactions, state.filters, state.settings, txCb);
+}
+
+function renderAll() {
+  const has = state.transactions.length > 0;
+  dom.empty.hidden = has;
+  dom.tabs.hidden = !has;
+  if (!has) {
+    dom.dashboard.hidden = true;
+    dom.transactions.hidden = true;
+    dom.range.textContent = '';
+    return;
+  }
+  const months = [...new Set(state.transactions.map(monthKey).filter(Boolean))].sort();
+  dom.range.textContent = months.length ? `${months[0]} to ${months[months.length - 1]} · ${state.transactions.length} transactions` : '';
+  renderDashboardPanel();
+  renderTransactionsPanel();
+}
+
+// ---- Tabs -----------------------------------------------------------------
+
+function showTab(name) {
+  for (const btn of dom.tabs.querySelectorAll('.tab')) btn.classList.toggle('active', btn.dataset.tab === name);
+  dom.dashboard.hidden = name !== 'dashboard';
+  dom.transactions.hidden = name !== 'transactions';
+  if (name === 'transactions') renderTransactionsPanel();
+}
+
+// ---- Wiring ---------------------------------------------------------------
+
+document.getElementById('importBtn').addEventListener('click', () => dom.fileInput.click());
+dom.dropzone.addEventListener('click', () => dom.fileInput.click());
+dom.fileInput.addEventListener('change', () => { readFile(dom.fileInput.files[0]); dom.fileInput.value = ''; });
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!state.transactions.length) return;
+  if (!confirm('Remove all imported data and tags from this browser?')) return;
+  store.clearAll();
+  state.transactions = [];
+  state.rules = store.loadRules();
+  state.catSettings = store.loadCategorySettings();
+  state.settings = store.loadSettings();
+  renderAll();
+});
+
+for (const btn of dom.tabs.querySelectorAll('.tab')) {
+  btn.addEventListener('click', () => showTab(btn.dataset.tab));
+}
+
+['dragenter', 'dragover'].forEach((ev) => window.addEventListener(ev, (e) => {
+  e.preventDefault();
+  dom.dropzone.classList.add('over');
+}));
+['dragleave', 'drop'].forEach((ev) => window.addEventListener(ev, (e) => {
+  e.preventDefault();
+  if (ev === 'drop') {
+    const file = e.dataTransfer && e.dataTransfer.files[0];
+    if (file) readFile(file);
+  }
+  dom.dropzone.classList.remove('over');
+}));
+
+renderAll();

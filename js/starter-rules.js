@@ -18,4 +18,6 @@ export const STARTER_RULES = [
   ...toRules('Water', ['CANAL DE ISABEL', 'AGUAS', 'EMASESA', 'HIDRALIA', 'AGBAR', 'AQUALIA']),
   ...toRules('Dog food', ['TIENDANIMAL', 'KIWOKO', 'ZOOPLUS', 'MASKOTA']),
   ...toRules('Car insurance', ['MUTUA', 'MAPFRE', 'LINEA DIRECTA', 'ALLIANZ', 'GENERALI', 'ZURICH', 'PELAYO', 'REALE', 'AXA']),
+  // Amazon retail is usually stuff for the house. Manual tags still win.
+  { field: 'any', contains: 'AMZN', category: 'Home stuff' },
 ];

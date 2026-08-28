@@ -14,6 +14,8 @@ export const CATEGORIES = [
   { name: 'Electricity',        essential: true,  annual: false },
   { name: 'Subscriptions',      essential: false, annual: false },
   { name: 'Dog food',           essential: true,  annual: false },
+  { name: "Kid's education",    essential: true,  annual: false, note: 'school, materials, etc' },
+  { name: 'Health insurance',   essential: true,  annual: false },
   { name: 'Car insurance',      essential: true,  annual: true,  note: 'prorated over 12 months' },
   { name: 'Property tax',       essential: true,  annual: true,  note: 'prorated over 12 months' },
   { name: 'Road tax',           essential: true,  annual: true },
@@ -29,7 +31,8 @@ export const CATEGORIES = [
   { name: 'Leisure',            essential: false, annual: false, note: 'dining out etc' },
   { name: 'Travel',             essential: false, annual: false },
   { name: 'Clothes',            essential: false, annual: false },
-  { name: 'Unexpected/Other',   essential: false, annual: false },
+  { name: 'Unexpected/Other',   essential: true,  annual: false, note: 'irregular but real — feeds a smoothed monthly buffer' },
+  { name: 'One-off',            essential: false, annual: false, ignore: true, note: 'wedding, moving, big purchase — not a monthly cost' },
 ];
 
 export const CATEGORY_NAMES = CATEGORIES.map((c) => c.name);

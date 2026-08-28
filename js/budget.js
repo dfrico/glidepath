@@ -58,6 +58,7 @@ export function computeBudget(transactions, catSettings, settings) {
 
   const rows = [];
   let runway = 0;
+  let optionalMonthly = 0;
   for (const c of CATEGORIES) {
     const s = catSettings[c.name];
     const agg = cats[c.name];
@@ -73,7 +74,10 @@ export function computeBudget(transactions, catSettings, settings) {
       note: c.note || '',
     });
     if (s.essential) runway += monthly;
+    else optionalMonthly += monthly;
   }
+  const untaggedMonthly = untaggedIncluded / includedCount;
+  const plannedMonthly = runway + optionalMonthly + untaggedMonthly;
 
   // Income and spend averages over included months only.
   let incIncome = 0;
@@ -90,6 +94,20 @@ export function computeBudget(transactions, catSettings, settings) {
   const runwayMonths = cash != null && runway > 0 ? cash / runway : null;
   const burnMonths = cash != null && avgSpend > 0 ? cash / avgSpend : null;
 
+  // Target-based plan: "to make my cash last N months, what can I spend?"
+  const targetMonths = settings.targetMonths;
+  let plan = null;
+  if (cash != null && targetMonths > 0) {
+    const allowedMonthly = cash / targetMonths;
+    plan = {
+      targetMonths,
+      allowedMonthly,
+      essentials: runway,
+      optionalRoom: allowedMonthly - runway, // what's left for optional after essentials
+      surplus: allowedMonthly - plannedMonthly, // vs your current typical spend
+    };
+  }
+
   return {
     months,
     includedMonths,
@@ -98,11 +116,15 @@ export function computeBudget(transactions, catSettings, settings) {
     categories: rows,
     untaggedIncluded,
     untaggedCount,
+    untaggedMonthly,
     runway,
+    optionalMonthly,
+    plannedMonthly,
     avgSpend,
     avgIncome,
     runwayMonths,
     burnMonths,
+    plan,
   };
 }
 

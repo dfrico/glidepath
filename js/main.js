@@ -4,7 +4,8 @@ import * as store from './store.js';
 import { parseCsv } from './parse.js';
 import { applyRules, autoTagAll, makeRuleFromTx } from './tagging.js';
 import { computeBudget, monthKey } from './budget.js';
-import { renderDashboard } from './dashboard.js';
+import { monthMatrix, topExpenses } from './analysis.js';
+import { renderOverview, renderCategories } from './dashboard.js';
 import { renderTransactions } from './transactions.js';
 
 const state = {
@@ -17,7 +18,8 @@ const state = {
 
 const dom = {
   empty: document.getElementById('empty'),
-  dashboard: document.getElementById('dashboard'),
+  overview: document.getElementById('overview'),
+  categories: document.getElementById('categories'),
   transactions: document.getElementById('transactions'),
   tabs: document.getElementById('tabs'),
   range: document.getElementById('range'),
@@ -103,7 +105,8 @@ function upsertRule(t, category) {
 function updateCat(name, patch) {
   state.catSettings[name] = { ...state.catSettings[name], ...patch };
   store.saveCategorySettings(state.catSettings);
-  renderDashboardPanel();
+  renderOverviewPanel();
+  renderCategoriesPanel();
 }
 
 function updateSettings(patch) {
@@ -115,12 +118,19 @@ const dashCb = {
   onEssential: (name, v) => updateCat(name, { essential: v }),
   onAnnual: (name, v) => updateCat(name, { annual: v }),
   onOverride: (name, v) => updateCat(name, { budgetOverride: v }),
-  onCash: (v) => { updateSettings({ cash: v }); renderDashboardPanel(); },
+  onCash: (v) => { updateSettings({ cash: v }); renderOverviewPanel(); },
+  onTarget: (v) => { updateSettings({ targetMonths: v }); renderOverviewPanel(); },
   onMonthInclude: (m, include) => {
     const set = new Set(state.settings.excludedMonths);
     if (include) set.delete(m); else set.add(m);
     updateSettings({ excludedMonths: [...set] });
-    renderDashboardPanel();
+    renderOverviewPanel();
+    renderCategoriesPanel();
+  },
+  onFocusPartner: (partner) => {
+    state.filters.q = partner;
+    state.filters.untaggedOnly = false;
+    showTab('transactions');
   },
   gotoUntagged: () => {
     state.filters.untaggedOnly = true;
@@ -163,9 +173,16 @@ function cell(v) {
 
 // ---- Rendering ------------------------------------------------------------
 
-function renderDashboardPanel() {
+function renderOverviewPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
-  renderDashboard(dom.dashboard, budget, state.settings, dashCb);
+  const matrix = monthMatrix(state.transactions, state.settings.excludedMonths);
+  const tops = topExpenses(state.transactions, 12, state.settings.excludedMonths);
+  renderOverview(dom.overview, budget, matrix, tops, state.settings, dashCb);
+}
+
+function renderCategoriesPanel() {
+  const budget = computeBudget(state.transactions, state.catSettings, state.settings);
+  renderCategories(dom.categories, budget, dashCb);
 }
 
 function renderTransactionsPanel() {
@@ -177,22 +194,27 @@ function renderAll() {
   dom.empty.hidden = has;
   dom.tabs.hidden = !has;
   if (!has) {
-    dom.dashboard.hidden = true;
+    dom.overview.hidden = true;
+    dom.categories.hidden = true;
     dom.transactions.hidden = true;
     dom.range.textContent = '';
     return;
   }
   const months = [...new Set(state.transactions.map(monthKey).filter(Boolean))].sort();
   dom.range.textContent = months.length ? `${months[0]} to ${months[months.length - 1]} · ${state.transactions.length} transactions` : '';
-  renderDashboardPanel();
+  renderOverviewPanel();
+  renderCategoriesPanel();
   renderTransactionsPanel();
+  const current = dom.tabs.querySelector('.tab.active');
+  showTab(current ? current.dataset.tab : 'overview');
 }
 
 // ---- Tabs -----------------------------------------------------------------
 
 function showTab(name) {
   for (const btn of dom.tabs.querySelectorAll('.tab')) btn.classList.toggle('active', btn.dataset.tab === name);
-  dom.dashboard.hidden = name !== 'dashboard';
+  dom.overview.hidden = name !== 'overview';
+  dom.categories.hidden = name !== 'categories';
   dom.transactions.hidden = name !== 'transactions';
   if (name === 'transactions') renderTransactionsPanel();
 }

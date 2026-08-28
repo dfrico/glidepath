@@ -33,7 +33,12 @@ export function saveCategorySettings(v) { write(K.cats, v); }
 
 export function loadSettings() {
   const s = read(K.settings, {});
-  return { learn: s.learn ?? true, cash: s.cash ?? null, excludedMonths: s.excludedMonths ?? [] };
+  return {
+    learn: s.learn ?? true,
+    cash: s.cash ?? null,
+    targetMonths: s.targetMonths ?? null,
+    excludedMonths: s.excludedMonths ?? [],
+  };
 }
 export function saveSettings(v) { write(K.settings, v); }
 

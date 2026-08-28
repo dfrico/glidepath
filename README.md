@@ -18,22 +18,35 @@ block when you open the file directly with `file://`.)
 ## Use it
 
 1. Drop your bank CSV on the page, or click "Import CSV".
-2. The app auto-tags known merchants and shows the dashboard.
+2. The app auto-tags known merchants and opens on Overview.
 3. Go to Transactions, filter to "Untagged only", and tag the rest.
    With "Learn" on, tagging one row tags every untagged row from the same
    partner and remembers it for next time.
-4. On the dashboard:
-   - Set your cash on hand to see your runway in months.
-   - Toggle "Essential" per category to shape the minimum monthly runway.
-   - Toggle "Annual" for yearly costs (spread over 12 months).
-   - Untick outlier months (e.g. your wedding month) to keep them out of the
-     averages and runway.
+
+## The three tabs
+
+- Overview — the insights:
+  - Headline numbers: average income, spend, net, and the minimum per month.
+  - Budget plan: enter your cash and how many months you want it to last. It
+    gives you a monthly spending cap, your essentials floor, the room left for
+    optional spend, and a clear verdict (within budget, or cut €X per month).
+  - Monthly breakdown: a category-by-month grid, shaded by amount, with an
+    average-per-month column. Untick a month header (e.g. your wedding month)
+    to keep it out of the averages.
+  - Top single expenses: your biggest one-off payments. Click one to find it
+    in Transactions.
+  - Where to cut: your biggest optional costs per month.
+- Categories — the controls: toggle Essential and Annual per category, or set a
+  fixed monthly override.
+- Transactions — the full list, filter, search, and fast tagging.
 
 ## Key numbers
 
 - Minimum / month = sum of essential categories. This is your runway base.
 - Runway at essentials only = cash on hand ÷ minimum monthly.
 - Runway at current spend = cash on hand ÷ average monthly spend.
+- Budget plan cap = cash on hand ÷ target months. Room for optional = cap minus
+  essentials.
 
 ## Files
 
@@ -43,8 +56,10 @@ block when you open the file directly with `file://`.)
 - `js/categories.js` — the category list and defaults
 - `js/starter-rules.js` — merchant auto-tag rules (edit freely)
 - `js/tagging.js` — the auto-tag engine
-- `js/budget.js` — the budget and runway maths
-- `js/dashboard.js`, `js/transactions.js` — the two panels
+- `js/budget.js` — the budget, runway, and plan maths
+- `js/analysis.js` — the month-by-category matrix and top expenses
+- `js/dashboard.js` — the Overview and Categories views
+- `js/transactions.js` — the transaction list and tagging
 - `js/store.js` — saves everything in the browser
 - `js/main.js` — wires it together
 

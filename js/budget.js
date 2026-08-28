@@ -9,6 +9,15 @@ import { CATEGORIES } from './categories.js';
 
 export function monthKey(t) { return (t.bookingDate || t.valueDate || '').slice(0, 7); }
 
+// "2026-08" + 2 -> "2026-10". Used by the cash forecast.
+export function addMonths(ym, k) {
+  const [y, m] = ym.split('-').map(Number);
+  const idx = y * 12 + (m - 1) + k;
+  const ny = Math.floor(idx / 12);
+  const nm = (idx % 12) + 1;
+  return `${ny}-${String(nm).padStart(2, '0')}`;
+}
+
 function uniqueMonths(transactions) {
   const set = new Set();
   for (const t of transactions) {
@@ -70,9 +79,11 @@ export function computeBudget(transactions, catSettings, settings) {
       monthly,
       essential: s.essential,
       annual: s.annual,
+      ignore: s.ignore,
       override: s.budgetOverride,
       note: c.note || '',
     });
+    if (s.ignore) continue; // not counted as spending (e.g. transfers to savings)
     if (s.essential) runway += monthly;
     else optionalMonthly += monthly;
   }

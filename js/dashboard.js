@@ -3,21 +3,42 @@
 //   renderCategories — the controls: essential/annual/override per category
 
 import { el, eur, eur2, table } from './dom.js';
+import { CATEGORY_NAMES } from './categories.js';
 
 const ACCENT_RGB = '79,157,255';
+const HUE_PLAN = '#3987e5'; // current-plan line
+const HUE_ESS = '#d95926'; // essentials-only line
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // ---- Overview -------------------------------------------------------------
 
-export function renderOverview(root, b, matrix, tops, settings, cb) {
+export function renderOverview(root, b, matrix, tops, recurring, forecast, settings, cb) {
   const parts = [];
   if (b.untaggedCount > 0) parts.push(untaggedBanner(b, cb));
   parts.push(kpis(b));
   parts.push(planCard(b, settings, cb));
+  parts.push(forecastCard(forecast, settings, cb));
   parts.push(matrixCard(matrix, cb));
+  const rec = recurringCard(recurring);
+  if (rec) parts.push(rec);
   parts.push(topCard(tops, cb));
   const cuts = cutCandidates(b);
   if (cuts) parts.push(cuts);
   root.replaceChildren(...parts);
+}
+
+function monthLabel(ym) {
+  if (!ym) return 'now';
+  const [y, m] = ym.split('-').map(Number);
+  return `${MON[m - 1]} ${y}`;
+}
+function monthShort(ym) {
+  if (!ym) return 'now';
+  const [y, m] = ym.split('-').map(Number);
+  return `${MON[m - 1]} '${String(y).slice(2)}`;
+}
+function fmtRunout(proj) {
+  return proj.runout ? `${monthLabel(proj.runout.ym)} · ${proj.runout.i} mo` : `beyond ${proj.cap} months`;
 }
 
 function untaggedBanner(b, cb) {
@@ -104,6 +125,122 @@ function planStat(label, value, sub, cls) {
 function status(kind, text) {
   const icon = kind === 'good' ? '✓' : kind === 'warning' ? '!' : '✕';
   return el('div', { class: 'status status-' + kind }, [el('span', { class: 'status-icon', text: icon }), el('span', { text })]);
+}
+
+// ---- Cash forecast --------------------------------------------------------
+
+function forecastCard(fc, settings, cb) {
+  const income = el('input', { type: 'number', class: 'num-input', placeholder: '0', min: '0', value: settings.futureIncome ?? 0 });
+  income.addEventListener('change', () => cb.onFutureIncome(income.value === '' ? 0 : parseFloat(income.value)));
+
+  const months = el('input', { type: 'number', class: 'num-input', placeholder: 'ongoing', min: '1', value: settings.futureIncomeMonths ?? '' });
+  months.addEventListener('change', () => cb.onIncomeMonths(months.value === '' ? null : parseFloat(months.value)));
+
+  const inputs = el('div', { class: 'plan-inputs' }, [
+    el('label', {}, ['Expected income (€/mo)', income]),
+    el('label', {}, ['for how many months', months]),
+  ]);
+
+  const head = el('h3', { text: 'Cash forecast' });
+  if (!fc) {
+    return el('div', { class: 'card' }, [head, inputs, el('p', { class: 'muted', text: 'Set your cash on hand in Budget plan above to see the forecast.' })]);
+  }
+
+  const heads = el('div', { class: 'forecast-heads' }, [
+    forecastHead('Essentials only', fmtRunout(fc.ess), HUE_ESS),
+    forecastHead('Current plan', fmtRunout(fc.planned), HUE_PLAN),
+  ]);
+
+  return el('div', { class: 'card' }, [
+    head,
+    el('p', { class: 'muted', text: `From ${monthLabel(fc.startYm)} with ${eur.format(fc.cash)} in cash. Income covers ${settings.futureIncomeMonths ? settings.futureIncomeMonths + ' months' : 'every month'}.` }),
+    inputs,
+    heads,
+    buildForecastChart(fc),
+    forecastTable(fc.ess),
+  ]);
+}
+
+function forecastHead(label, value, hue) {
+  return el('div', { class: 'fc-head' }, [
+    el('span', { class: 'legend-dot', style: `background:${hue}` }),
+    el('div', {}, [el('div', { class: 'muted small', text: label }), el('div', { class: 'fc-val', text: value })]),
+  ]);
+}
+
+function buildForecastChart(fc) {
+  const A = fc.planned.points; // blue
+  const B = fc.ess.points; // orange
+  const maxI = Math.max(A[A.length - 1].i, B[B.length - 1].i, 1);
+  const balances = [...A, ...B].map((p) => p.balance);
+  const yMax = Math.max(fc.cash, ...balances, 0);
+  const yMin = Math.min(0, ...balances);
+  const span = yMax - yMin || 1;
+
+  const W = 760, H = 300, L = 60, R = 18, T = 16, Bm = 30;
+  const plotW = W - L - R, plotH = H - T - Bm;
+  const x = (i) => L + plotW * (i / maxI);
+  const y = (v) => T + plotH * (1 - (v - yMin) / span);
+  const zeroY = y(0);
+  const linePts = (pts) => pts.map((p) => `${x(p.i).toFixed(1)},${y(p.balance).toFixed(1)}`).join(' ');
+  const ymAt = (i) => (A[i] && A[i].ym) || (B[i] && B[i].ym) || null;
+
+  const step = Math.max(1, Math.ceil(maxI / 6));
+  let xticks = '';
+  for (let i = 0; i <= maxI; i += step) {
+    xticks += `<text x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle" fill="#898781" font-size="11">${monthShort(ymAt(i))}</text>`;
+  }
+  const mark = (proj, color) => proj.runout
+    ? `<circle cx="${x(proj.runout.i).toFixed(1)}" cy="${zeroY.toFixed(1)}" r="4" fill="${color}"/><text x="${x(proj.runout.i).toFixed(1)}" y="${(zeroY - 8).toFixed(1)}" text-anchor="middle" fill="${color}" font-size="11">out ${monthShort(proj.runout.ym)}</text>`
+    : '';
+  const hover = A.map((p) => `<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.balance).toFixed(1)}" r="7" fill="transparent"><title>${monthLabel(p.ym)}: ${eur.format(p.balance)}</title></circle>`).join('');
+
+  const svg = `<svg viewBox="0 0 ${W} ${H}" class="fc-svg" role="img" aria-label="Cash balance forecast">
+    <line x1="${L}" y1="${zeroY.toFixed(1)}" x2="${W - R}" y2="${zeroY.toFixed(1)}" stroke="#ff6b6b" stroke-dasharray="4 4" stroke-width="1"/>
+    <text x="${L - 8}" y="${(y(yMax) + 4).toFixed(1)}" text-anchor="end" fill="#898781" font-size="11">${eur.format(yMax)}</text>
+    <text x="${L - 8}" y="${(zeroY + 4).toFixed(1)}" text-anchor="end" fill="#898781" font-size="11">€0</text>
+    <polyline fill="none" stroke="${HUE_ESS}" stroke-width="2" points="${linePts(B)}"/>
+    <polyline fill="none" stroke="${HUE_PLAN}" stroke-width="2" points="${linePts(A)}"/>
+    ${mark(fc.ess, HUE_ESS)}${mark(fc.planned, HUE_PLAN)}${xticks}${hover}
+  </svg>`;
+  return el('div', { class: 'fc-chart', html: svg });
+}
+
+function forecastTable(proj) {
+  const rows = proj.points.filter((p) => p.i > 0).slice(0, 24).map((p) => el('tr', {}, [
+    el('td', { text: monthLabel(p.ym) }),
+    el('td', { class: 'num pos', text: p.income ? eur.format(p.income) : '—' }),
+    el('td', { class: 'num', text: eur.format(p.spend) }),
+    el('td', { class: 'num strong ' + (p.balance <= 0 ? 'neg' : ''), text: eur.format(p.balance) }),
+  ]));
+  return el('details', { class: 'fc-details' }, [
+    el('summary', { text: 'Month-by-month (essentials plan)' }),
+    table(['Month', 'Income', 'Spend', 'Balance'], rows),
+  ]);
+}
+
+// ---- Recurring commitments ------------------------------------------------
+
+function recurringCard(rec) {
+  if (!rec.length) return null;
+  const totalMo = rec.reduce((a, r) => a + r.monthly, 0);
+  const cancMo = rec.filter((r) => r.cancelable).reduce((a, r) => a + r.monthly, 0);
+  const rows = rec.slice(0, 20).map((r) => el('tr', { class: r.cancelable ? 'cancelable' : '' }, [
+    el('td', { title: r.name }, r.name),
+    el('td', {}, [
+      r.category ? el('span', { text: r.category }) : el('span', { class: 'muted', text: 'untagged' }),
+      r.varies ? el('span', { class: 'tag', text: 'varies' }) : null,
+      r.cancelable ? el('span', { class: 'tag cut', text: 'cut?' }) : null,
+    ]),
+    el('td', { class: 'num strong', text: eur.format(r.monthly) }),
+    el('td', { class: 'num muted', text: eur.format(r.yearly) }),
+    el('td', { class: 'num muted', text: `${r.monthsSeen} mo` }),
+  ]));
+  return el('div', { class: 'card' }, [
+    el('h3', { text: 'Recurring commitments' }),
+    el('p', { class: 'muted', text: `Payments that repeat most months: about ${eur.format(totalMo)} per month, of which ${eur.format(cancMo)} is optional and could be cut.` }),
+    table(['Partner', 'Category', '€/mo', '€/yr', 'Seen'], rows),
+  ]);
 }
 
 // Month-by-category matrix, shaded by amount. Numbers are always shown.
@@ -220,16 +357,22 @@ function cutCandidates(b) {
 
 // ---- Categories (controls) ------------------------------------------------
 
-export function renderCategories(root, b, cb) {
+export function renderCategories(root, data, cb) {
+  const b = data.budget;
   const sorted = [...b.categories].sort((a, c) => c.monthly - a.monthly);
   const rows = sorted.map((c) => {
     const ess = el('input', { type: 'checkbox' });
     ess.checked = c.essential;
+    ess.disabled = c.ignore;
     ess.addEventListener('change', () => cb.onEssential(c.name, ess.checked));
 
     const ann = el('input', { type: 'checkbox' });
     ann.checked = c.annual;
     ann.addEventListener('change', () => cb.onAnnual(c.name, ann.checked));
+
+    const ign = el('input', { type: 'checkbox' });
+    ign.checked = c.ignore;
+    ign.addEventListener('change', () => cb.onIgnore(c.name, ign.checked));
 
     const ov = el('input', { type: 'number', class: 'ov-input', placeholder: 'auto', min: '0', value: c.override ?? '' });
     ov.addEventListener('change', () => cb.onOverride(c.name, ov.value === '' ? null : parseFloat(ov.value)));
@@ -237,16 +380,18 @@ export function renderCategories(root, b, cb) {
     const label = el('td', {}, [
       el('span', { text: c.name }),
       c.annual ? el('span', { class: 'tag', text: 'annual/12' }) : null,
+      c.ignore ? el('span', { class: 'tag', text: 'not counted' }) : null,
       c.note ? el('span', { class: 'note', text: ' · ' + c.note }) : null,
     ]);
 
-    return el('tr', { class: c.essential ? 'essential-row' : 'opt-row' }, [
+    return el('tr', { class: c.ignore ? 'ignored-row' : c.essential ? 'essential-row' : 'opt-row' }, [
       label,
       el('td', { class: 'num strong', text: eur.format(c.monthly) }),
       el('td', { class: 'num muted', text: eur.format(c.total) }),
       el('td', { class: 'num muted', text: String(c.count) }),
       el('td', { class: 'center' }, [ess]),
       el('td', { class: 'center' }, [ann]),
+      el('td', { class: 'center' }, [ign]),
       el('td', {}, [ov]),
     ]);
   });
@@ -254,13 +399,57 @@ export function renderCategories(root, b, cb) {
   const foot = el('tr', { class: 'total-row' }, [
     el('td', { text: 'Minimum monthly runway (essentials)' }),
     el('td', { class: 'num strong', text: eur.format(b.runway) }),
-    el('td', {}), el('td', {}), el('td', {}), el('td', {}), el('td', {}),
+    el('td', {}), el('td', {}), el('td', {}), el('td', {}), el('td', {}), el('td', {}),
   ]);
   rows.push(foot);
 
-  root.replaceChildren(el('div', { class: 'card' }, [
-    el('h3', { text: 'Categories' }),
-    el('p', { class: 'muted', text: 'Essential feeds the runway. Annual spreads a yearly cost over 12 months. Override sets a fixed €/month. Monthly is the typical-month cost; annual categories show yearly total ÷ 12.' }),
-    table(['Category', 'Monthly', 'Total', '#', 'Essential', 'Annual', 'Override'], rows),
+  root.replaceChildren(
+    el('div', { class: 'card' }, [
+      el('h3', { text: 'Categories' }),
+      el('p', { class: 'muted', text: 'Essential feeds the runway. Annual spreads a yearly cost over 12 months. Ignore drops a category from all spending totals (e.g. transfers to savings). Override sets a fixed €/month.' }),
+      table(['Category', 'Monthly', 'Total', '#', 'Essential', 'Annual', 'Ignore', 'Override'], rows),
+    ]),
+    rulesCard(data.rules, cb),
+  );
+}
+
+function selectCategory(current, onChange) {
+  const sel = el('select', { class: 'sel' });
+  sel.appendChild(el('option', { value: '', text: '— untagged —' }));
+  for (const n of CATEGORY_NAMES) {
+    const o = el('option', { value: n, text: n });
+    if (n === current) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change', () => onChange(sel.value));
+  return sel;
+}
+
+function rulesCard(rules, cb) {
+  const rows = rules.map((r, idx) => el('tr', {}, [
+    el('td', { class: 'mono', title: r.contains }, r.contains),
+    el('td', { class: 'muted', text: r.field }),
+    el('td', {}, [selectCategory(r.category, (v) => cb.onRuleChange(idx, v))]),
+    el('td', {}, [el('button', { class: 'btn small ghost', onclick: () => cb.onRuleDelete(idx) }, 'Delete')]),
   ]));
+
+  const contains = el('input', { type: 'text', class: 'search', placeholder: 'text to match, e.g. NETFLIX' });
+  const field = el('select', { class: 'sel' });
+  for (const f of ['partnerName', 'reference', 'iban', 'any']) field.appendChild(el('option', { value: f, text: f }));
+  const cat = selectCategory('', () => {});
+  const add = el('button', {
+    class: 'btn small',
+    onclick: () => {
+      const v = contains.value.trim();
+      if (!v) return;
+      cb.onRuleAdd({ field: field.value, contains: v.toUpperCase(), category: cat.value });
+    },
+  }, 'Add rule');
+
+  return el('div', { class: 'card' }, [
+    el('h3', { text: 'Auto-tag rules' }),
+    el('p', { class: 'muted', text: 'The first matching rule wins. Editing here re-tags everything you have not tagged by hand.' }),
+    table(['Match', 'Field', 'Category', ''], rows),
+    el('div', { class: 'toolbar' }, [contains, field, cat, add]),
+  ]);
 }

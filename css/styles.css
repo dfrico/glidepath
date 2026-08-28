@@ -218,7 +218,26 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .top-meta { font-size: 12px; }
 .top-amount { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+/* Cash forecast */
+.forecast-heads { display: flex; gap: 30px; flex-wrap: wrap; margin: 10px 0 12px; }
+.fc-head { display: flex; align-items: center; gap: 10px; }
+.fc-val { font-size: 18px; font-weight: 700; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; flex: none; display: inline-block; }
+.fc-chart { width: 100%; }
+.fc-svg { width: 100%; height: auto; display: block; }
+.fc-svg circle[fill="transparent"] { cursor: crosshair; }
+.fc-details { margin-top: 12px; }
+.fc-details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+
+/* Recurring & rules */
+tr.cancelable td:first-child { border-left: 3px solid var(--warn); }
+.tag.cut { background: rgba(250,178,25,.18); color: var(--warn); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.ignored-row td { opacity: .6; }
+.ignored-row td:first-child { border-left: 3px solid transparent; }
+
 @media (max-width: 780px) {
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .plan-grid { grid-template-columns: 1fr; }
+  .forecast-heads { gap: 18px; }
 }

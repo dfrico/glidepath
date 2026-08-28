@@ -80,6 +80,46 @@ function emptyRow(months) {
   return { byMonth };
 }
 
+// Payments that repeat across several months from the same partner.
+// These are your recurring commitments — the easiest, highest-leverage cuts.
+export function recurringCommitments(transactions, essentialNames) {
+  const essential = new Set(essentialNames || []);
+  const map = new Map();
+  for (const t of transactions) {
+    if (t.amount >= 0) continue;
+    const key = (t.partnerName || '').toUpperCase().trim();
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, { name: t.partnerName || key, months: new Set(), amounts: [], catCount: {} });
+    const e = map.get(key);
+    e.months.add(monthKey(t));
+    e.amounts.push(-t.amount);
+    const c = t.category || '';
+    e.catCount[c] = (e.catCount[c] || 0) + 1;
+  }
+
+  const out = [];
+  for (const e of map.values()) {
+    if (e.months.size < 3) continue; // needs to appear in at least 3 months
+    const sorted = e.amounts.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    const variance = sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / sorted.length;
+    const cv = mean ? Math.sqrt(variance) / mean : 0;
+    const category = Object.entries(e.catCount).sort((a, b) => b[1] - a[1])[0][0];
+    out.push({
+      name: e.name,
+      category,
+      monthly: median,
+      yearly: median * 12,
+      monthsSeen: e.months.size,
+      occurrences: e.amounts.length,
+      varies: cv > 0.3,
+      cancelable: category !== '' && !essential.has(category),
+    });
+  }
+  return out.sort((a, b) => b.monthly - a.monthly);
+}
+
 export function topExpenses(transactions, n, excludedMonths) {
   const excluded = new Set(excludedMonths || []);
   return transactions

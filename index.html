@@ -12,9 +12,12 @@
     <div class="range muted" id="range"></div>
     <div class="actions">
       <button id="importBtn" class="btn">Import CSV</button>
+      <button id="backupBtn" class="btn ghost">Backup</button>
+      <button id="restoreBtn" class="btn ghost">Restore</button>
       <button id="clearBtn" class="btn ghost">Clear data</button>
     </div>
     <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden>
+    <input type="file" id="jsonInput" accept=".json,application/json" hidden>
   </header>
 
   <nav class="tabs" id="tabs" hidden>

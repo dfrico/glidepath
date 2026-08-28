@@ -3,8 +3,9 @@
 import * as store from './store.js';
 import { parseCsv } from './parse.js';
 import { applyRules, autoTagAll, makeRuleFromTx } from './tagging.js';
-import { computeBudget, monthKey } from './budget.js';
-import { monthMatrix, topExpenses } from './analysis.js';
+import { computeBudget, monthKey, addMonths } from './budget.js';
+import { monthMatrix, topExpenses, recurringCommitments } from './analysis.js';
+import { project } from './forecast.js';
 import { renderOverview, renderCategories } from './dashboard.js';
 import { renderTransactions } from './transactions.js';
 
@@ -24,6 +25,7 @@ const dom = {
   tabs: document.getElementById('tabs'),
   range: document.getElementById('range'),
   fileInput: document.getElementById('fileInput'),
+  jsonInput: document.getElementById('jsonInput'),
   dropzone: document.getElementById('dropzone'),
 };
 
@@ -114,12 +116,22 @@ function updateSettings(patch) {
   store.saveSettings(state.settings);
 }
 
+function afterRulesChange() {
+  store.saveRules(state.rules);
+  autoTagAll(state.transactions, state.rules);
+  store.saveTransactions(state.transactions);
+  renderAll();
+}
+
 const dashCb = {
   onEssential: (name, v) => updateCat(name, { essential: v }),
   onAnnual: (name, v) => updateCat(name, { annual: v }),
+  onIgnore: (name, v) => updateCat(name, { ignore: v }),
   onOverride: (name, v) => updateCat(name, { budgetOverride: v }),
   onCash: (v) => { updateSettings({ cash: v }); renderOverviewPanel(); },
   onTarget: (v) => { updateSettings({ targetMonths: v }); renderOverviewPanel(); },
+  onFutureIncome: (v) => { updateSettings({ futureIncome: v }); renderOverviewPanel(); },
+  onIncomeMonths: (v) => { updateSettings({ futureIncomeMonths: v }); renderOverviewPanel(); },
   onMonthInclude: (m, include) => {
     const set = new Set(state.settings.excludedMonths);
     if (include) set.delete(m); else set.add(m);
@@ -127,6 +139,9 @@ const dashCb = {
     renderOverviewPanel();
     renderCategoriesPanel();
   },
+  onRuleChange: (idx, category) => { if (state.rules[idx]) { state.rules[idx].category = category; afterRulesChange(); } },
+  onRuleDelete: (idx) => { state.rules.splice(idx, 1); afterRulesChange(); },
+  onRuleAdd: (rule) => { state.rules.unshift(rule); afterRulesChange(); },
   onFocusPartner: (partner) => {
     state.filters.q = partner;
     state.filters.untaggedOnly = false;
@@ -157,13 +172,7 @@ function exportCsv() {
   for (const t of state.transactions) {
     lines.push([t.bookingDate, t.partnerName, t.reference, t.amount, t.category || ''].map(cell).join('\t'));
   }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'expenses-tagged.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  download('expenses-tagged.csv', lines.join('\n'), 'text/csv');
 }
 
 function cell(v) {
@@ -171,18 +180,70 @@ function cell(v) {
   return /[\t"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+function download(name, text, type) {
+  const blob = new Blob([text], { type: type || 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function backup() {
+  download('expense-budget-backup.json', JSON.stringify(store.exportState(), null, 2), 'application/json');
+}
+
+function restore(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(String(reader.result));
+      if (!confirm('Restore this backup? It replaces the current data and tags in this browser.')) return;
+      store.importState(obj);
+      state.transactions = store.loadTransactions();
+      state.rules = store.loadRules();
+      state.catSettings = store.loadCategorySettings();
+      state.settings = store.loadSettings();
+      renderAll();
+      alert(`Restored ${state.transactions.length} transactions.`);
+    } catch (e) {
+      alert('Could not restore: ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 // ---- Rendering ------------------------------------------------------------
+
+function buildForecast(budget) {
+  if (state.settings.cash == null) return null;
+  const months = [...new Set(state.transactions.map(monthKey).filter(Boolean))].sort();
+  if (!months.length) return null;
+  const startYm = addMonths(months[months.length - 1], 1);
+  const { cash, futureIncome, futureIncomeMonths } = state.settings;
+  return {
+    startYm,
+    cash,
+    ess: project(startYm, cash, futureIncome, futureIncomeMonths, budget.runway),
+    planned: project(startYm, cash, futureIncome, futureIncomeMonths, budget.plannedMonthly),
+  };
+}
 
 function renderOverviewPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
   const matrix = monthMatrix(state.transactions, state.settings.excludedMonths);
   const tops = topExpenses(state.transactions, 12, state.settings.excludedMonths);
-  renderOverview(dom.overview, budget, matrix, tops, state.settings, dashCb);
+  const essentialNames = budget.categories.filter((c) => c.essential && !c.ignore).map((c) => c.name);
+  const recurring = recurringCommitments(state.transactions, essentialNames);
+  const forecast = buildForecast(budget);
+  renderOverview(dom.overview, budget, matrix, tops, recurring, forecast, state.settings, dashCb);
 }
 
 function renderCategoriesPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
-  renderCategories(dom.categories, budget, dashCb);
+  renderCategories(dom.categories, { budget, rules: state.rules }, dashCb);
 }
 
 function renderTransactionsPanel() {
@@ -224,6 +285,10 @@ function showTab(name) {
 document.getElementById('importBtn').addEventListener('click', () => dom.fileInput.click());
 dom.dropzone.addEventListener('click', () => dom.fileInput.click());
 dom.fileInput.addEventListener('change', () => { readFile(dom.fileInput.files[0]); dom.fileInput.value = ''; });
+
+document.getElementById('backupBtn').addEventListener('click', backup);
+document.getElementById('restoreBtn').addEventListener('click', () => dom.jsonInput.click());
+dom.jsonInput.addEventListener('change', () => { restore(dom.jsonInput.files[0]); dom.jsonInput.value = ''; });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
   if (!state.transactions.length) return;

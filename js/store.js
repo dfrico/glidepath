@@ -24,6 +24,7 @@ export function loadCategorySettings() {
     out[c.name] = {
       essential: s.essential ?? c.essential,
       annual: s.annual ?? c.annual,
+      ignore: s.ignore ?? c.ignore ?? false,
       budgetOverride: s.budgetOverride ?? null,
     };
   }
@@ -37,12 +38,34 @@ export function loadSettings() {
     learn: s.learn ?? true,
     cash: s.cash ?? null,
     targetMonths: s.targetMonths ?? null,
+    futureIncome: s.futureIncome ?? 0,
+    futureIncomeMonths: s.futureIncomeMonths ?? null,
     excludedMonths: s.excludedMonths ?? [],
   };
 }
 export function saveSettings(v) { write(K.settings, v); }
 
 export function clearAll() { for (const k of Object.values(K)) localStorage.removeItem(k); }
+
+// Full backup, so tagging work survives a browser wipe.
+export function exportState() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    transactions: loadTransactions(),
+    rules: loadRules(),
+    categorySettings: read(K.cats, {}),
+    settings: read(K.settings, {}),
+  };
+}
+
+export function importState(obj) {
+  if (!obj || !Array.isArray(obj.transactions)) throw new Error('This file is not a valid backup.');
+  write(K.tx, obj.transactions);
+  if (obj.rules) write(K.rules, obj.rules);
+  if (obj.categorySettings) write(K.cats, obj.categorySettings);
+  if (obj.settings) write(K.settings, obj.settings);
+}
 
 function read(k, def) {
   try {

@@ -7,7 +7,7 @@ export const UNTAGGED = '';
 
 export const CATEGORIES = [
   { name: 'Mortgage',           essential: true,  annual: false },
-  { name: 'Savings',            essential: false, annual: false, note: 'money set aside, not consumed' },
+  { name: 'Savings',            essential: false, annual: false, ignore: true, note: 'money set aside, not consumed' },
   { name: 'HOA',                essential: true,  annual: false },
   { name: 'Heat',               essential: true,  annual: false },
   { name: 'Internet and phone', essential: true,  annual: false },

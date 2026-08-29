@@ -27,13 +27,15 @@ block when you open the file directly with `file://`.)
 
 - Overview — the insights:
   - Headline numbers: average income, spend, net, and the minimum per month.
-  - Budget plan: enter your cash and how many months you want it to last. It
-    gives you a monthly spending cap, your essentials floor, the room left for
-    optional spend, and a clear verdict (within budget, or cut €X per month).
-  - Cash forecast: add any expected income (e.g. unemployment benefit) and how
-    many months it lasts. It projects your balance month by month and shows the
-    exact month you run out, for two scenarios — essentials only and your
-    current plan. It updates as you toggle categories, so cuts turn into months.
+  - Budget plan: enter your cash, how many months you want it to last, and any
+    expected income (e.g. unemployment benefit) and how many months it lasts.
+    It gives you a monthly spending cap that counts that income, your essentials
+    floor, the room left for optional spend, and a clear verdict (within budget,
+    or cut €X per month). Income past the target horizon does not raise the cap.
+  - Cash forecast: uses the same cash and income figures from the budget plan.
+    It projects your balance month by month and shows the exact month you run
+    out, for two scenarios — essentials only and your current plan. It updates
+    as you toggle categories, so cuts turn into months.
   - Monthly breakdown: a category-by-month grid, shaded by amount, with an
     average-per-month column. Untick a month header (e.g. your wedding month)
     to keep it out of the averages.

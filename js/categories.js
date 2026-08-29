@@ -26,6 +26,7 @@ export const CATEGORIES = [
   { name: 'Coffee',             essential: false, annual: false, note: 'at home, beans' },
   { name: 'Gas',                essential: true,  annual: false },
   { name: 'Hair salon',         essential: false, annual: false },
+  { name: 'Gym & sports',       essential: false, annual: false },
   { name: 'Impulse buys',       essential: false, annual: false },
   { name: 'Home stuff',         essential: false, annual: false, note: 'decor or needs' },
   { name: 'Leisure',            essential: false, annual: false, note: 'dining out etc' },
@@ -33,6 +34,7 @@ export const CATEGORIES = [
   { name: 'Clothes',            essential: false, annual: false },
   { name: 'Unexpected/Other',   essential: true,  annual: false, note: 'irregular but real — feeds a smoothed monthly buffer' },
   { name: 'One-off',            essential: false, annual: false, ignore: true, note: 'wedding, moving, big purchase — not a monthly cost' },
+  { name: 'Income',             essential: false, annual: false, ignore: true, note: 'for tagging income rows; not counted as spending' },
 ];
 
 export const CATEGORY_NAMES = CATEGORIES.map((c) => c.name);

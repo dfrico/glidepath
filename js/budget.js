@@ -106,12 +106,24 @@ export function computeBudget(transactions, catSettings, settings) {
   const burnMonths = cash != null && avgSpend > 0 ? cash / avgSpend : null;
 
   // Target-based plan: "to make my cash last N months, what can I spend?"
+  // Expected income adds to the pot, but only for the months it actually arrives
+  // and only within the target horizon (income past the target does not help here).
   const targetMonths = settings.targetMonths;
   let plan = null;
   if (cash != null && targetMonths > 0) {
-    const allowedMonthly = cash / targetMonths;
+    const income = settings.futureIncome || 0;
+    const incomeMonthsRaw = settings.futureIncomeMonths; // null = ongoing
+    const incomeMonths = incomeMonthsRaw == null ? targetMonths : Math.min(incomeMonthsRaw, targetMonths);
+    const incomeTotal = income * incomeMonths;
+    const spendable = cash + incomeTotal; // total pot over the horizon
+    const allowedMonthly = spendable / targetMonths;
     plan = {
       targetMonths,
+      cash,
+      income,
+      incomeMonths,
+      incomeTotal,
+      spendable,
       allowedMonthly,
       essentials: runway,
       optionalRoom: allowedMonthly - runway, // what's left for optional after essentials

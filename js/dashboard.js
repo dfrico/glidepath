@@ -76,12 +76,20 @@ function planCard(b, settings, cb) {
   const cash = el('input', { type: 'number', class: 'num-input', placeholder: 'e.g. 12000', min: '0', value: settings.cash ?? '' });
   cash.addEventListener('change', () => cb.onCash(cash.value === '' ? null : parseFloat(cash.value)));
 
-  const target = el('input', { type: 'number', class: 'num-input', placeholder: 'e.g. 12', min: '1', value: settings.targetMonths ?? '' });
+  const target = el('input', { type: 'number', class: 'num-input mini', placeholder: 'e.g. 12', min: '1', value: settings.targetMonths ?? '' });
   target.addEventListener('change', () => cb.onTarget(target.value === '' ? null : parseFloat(target.value)));
 
+  const income = el('input', { type: 'number', class: 'num-input', placeholder: '0', min: '0', value: settings.futureIncome ?? 0 });
+  income.addEventListener('change', () => cb.onFutureIncome(income.value === '' ? 0 : parseFloat(income.value)));
+
+  const incMonths = el('input', { type: 'number', class: 'num-input mini', placeholder: 'ongoing', min: '1', value: settings.futureIncomeMonths ?? '' });
+  incMonths.addEventListener('change', () => cb.onIncomeMonths(incMonths.value === '' ? null : parseFloat(incMonths.value)));
+
   const inputs = el('div', { class: 'plan-inputs' }, [
-    el('label', {}, ['Cash on hand (€)', cash]),
-    el('label', {}, ['Make it last (months)', target]),
+    el('label', {}, ['Cash (€)', cash]),
+    el('label', {}, ['Make it last (mo)', target]),
+    el('label', {}, ['Income (€/mo)', income]),
+    el('label', {}, ['Income for (mo)', incMonths]),
   ]);
 
   const runwayLine = el('div', { class: 'plan-runway' }, [
@@ -103,6 +111,10 @@ function planVerdict(plan) {
     planStat('Room for optional', eur.format(plan.optionalRoom) + ' / mo', 'after essentials', plan.optionalRoom < 0 ? 'neg' : 'pos'),
   ]);
 
+  const note = plan.income > 0
+    ? el('p', { class: 'muted small', text: `Pot: ${eur.format(plan.cash)} cash + ${eur.format(plan.income)}/mo income for ${plan.incomeMonths} months (${eur.format(plan.incomeTotal)}) = ${eur.format(plan.spendable)} over ${plan.targetMonths} months.` })
+    : null;
+
   let verdict;
   if (plan.optionalRoom < 0) {
     verdict = status('critical', `Your essentials alone cost more than ${eur.format(plan.allowedMonthly)} per month. To last ${plan.targetMonths} months you must cut essentials, add cash, or shorten the target.`);
@@ -111,7 +123,7 @@ function planVerdict(plan) {
   } else {
     verdict = status('critical', `Cut about ${eur.format(-plan.surplus)} per month from your current spend to last ${plan.targetMonths} months.`);
   }
-  return el('div', {}, [rows, verdict]);
+  return el('div', {}, [rows, note, verdict]);
 }
 
 function planStat(label, value, sub, cls) {
@@ -130,20 +142,9 @@ function status(kind, text) {
 // ---- Cash forecast --------------------------------------------------------
 
 function forecastCard(fc, settings, cb) {
-  const income = el('input', { type: 'number', class: 'num-input', placeholder: '0', min: '0', value: settings.futureIncome ?? 0 });
-  income.addEventListener('change', () => cb.onFutureIncome(income.value === '' ? 0 : parseFloat(income.value)));
-
-  const months = el('input', { type: 'number', class: 'num-input', placeholder: 'ongoing', min: '1', value: settings.futureIncomeMonths ?? '' });
-  months.addEventListener('change', () => cb.onIncomeMonths(months.value === '' ? null : parseFloat(months.value)));
-
-  const inputs = el('div', { class: 'plan-inputs' }, [
-    el('label', {}, ['Expected income (€/mo)', income]),
-    el('label', {}, ['for how many months', months]),
-  ]);
-
   const head = el('h3', { text: 'Cash forecast' });
   if (!fc) {
-    return el('div', { class: 'card' }, [head, inputs, el('p', { class: 'muted', text: 'Set your cash on hand in Budget plan above to see the forecast.' })]);
+    return el('div', { class: 'card' }, [head, el('p', { class: 'muted', text: 'Set your cash on hand in Budget plan above to see the forecast.' })]);
   }
 
   const heads = el('div', { class: 'forecast-heads' }, [
@@ -153,8 +154,7 @@ function forecastCard(fc, settings, cb) {
 
   return el('div', { class: 'card' }, [
     head,
-    el('p', { class: 'muted', text: `From ${monthLabel(fc.startYm)} with ${eur.format(fc.cash)} in cash. Income covers ${settings.futureIncomeMonths ? settings.futureIncomeMonths + ' months' : 'every month'}.` }),
-    inputs,
+    el('p', { class: 'muted', text: `From ${monthLabel(fc.startYm)} with ${eur.format(fc.cash)} in cash. Income (set in Budget plan) covers ${settings.futureIncomeMonths ? settings.futureIncomeMonths + ' months' : 'every month'}.` }),
     heads,
     buildForecastChart(fc),
     forecastTable(fc.ess),
@@ -177,7 +177,7 @@ function buildForecastChart(fc) {
   const yMin = Math.min(0, ...balances);
   const span = yMax - yMin || 1;
 
-  const W = 760, H = 300, L = 60, R = 18, T = 16, Bm = 30;
+  const W = 760, H = 220, L = 60, R = 18, T = 16, Bm = 30;
   const plotW = W - L - R, plotH = H - T - Bm;
   const x = (i) => L + plotW * (i / maxI);
   const y = (v) => T + plotH * (1 - (v - yMin) / span);

@@ -19,5 +19,9 @@ export const STARTER_RULES = [
   ...toRules('Dog food', ['TIENDANIMAL', 'KIWOKO', 'ZOOPLUS', 'MASKOTA']),
   ...toRules('Car insurance', ['MUTUA', 'MAPFRE', 'LINEA DIRECTA', 'ALLIANZ', 'GENERALI', 'ZURICH', 'PELAYO', 'REALE', 'AXA']),
   // Amazon retail is usually stuff for the house. Manual tags still win.
+  // Two spellings appear on statements: "AMZN Mktp" and "AMAZON / WWW.AMAZON".
+  // These sit after the Subscriptions rules, so "Amazon Prime" still tags as a
+  // subscription (first matching rule wins).
   { field: 'any', contains: 'AMZN', category: 'Home stuff' },
+  { field: 'any', contains: 'AMAZON', category: 'Home stuff' },
 ];

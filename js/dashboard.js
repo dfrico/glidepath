@@ -76,13 +76,13 @@ function planCard(b, settings, cb) {
   const cash = el('input', { type: 'number', class: 'num-input', placeholder: 'e.g. 12000', min: '0', value: settings.cash ?? '' });
   cash.addEventListener('change', () => cb.onCash(cash.value === '' ? null : parseFloat(cash.value)));
 
-  const target = el('input', { type: 'number', class: 'num-input mini', placeholder: 'e.g. 12', min: '1', value: settings.targetMonths ?? '' });
+  const target = el('input', { type: 'number', class: 'num-input', placeholder: 'e.g. 12', min: '1', value: settings.targetMonths ?? '' });
   target.addEventListener('change', () => cb.onTarget(target.value === '' ? null : parseFloat(target.value)));
 
   const income = el('input', { type: 'number', class: 'num-input', placeholder: '0', min: '0', value: settings.futureIncome ?? 0 });
   income.addEventListener('change', () => cb.onFutureIncome(income.value === '' ? 0 : parseFloat(income.value)));
 
-  const incMonths = el('input', { type: 'number', class: 'num-input mini', placeholder: 'ongoing', min: '1', value: settings.futureIncomeMonths ?? '' });
+  const incMonths = el('input', { type: 'number', class: 'num-input', placeholder: 'ongoing', min: '1', value: settings.futureIncomeMonths ?? '' });
   incMonths.addEventListener('change', () => cb.onIncomeMonths(incMonths.value === '' ? null : parseFloat(incMonths.value)));
 
   const inputs = el('div', { class: 'plan-inputs' }, [

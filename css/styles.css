@@ -173,9 +173,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 /* Budget plan */
 .num-input { width: 120px; margin-left: 10px; }
 .plan-inputs { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
-.plan-inputs label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.plan-inputs .num-input { margin-left: 0; width: 120px; }
-.plan-inputs .num-input.mini { width: 72px; }
+.plan-inputs label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.plan-inputs .num-input { margin-left: 0; width: 80px; }
+
+/* Hide the native number-input spinner arrows across browsers. */
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .plan-runway { display: flex; gap: 24px; flex-wrap: wrap; font-size: 14px; margin-bottom: 14px; }
 .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
 .plan-stat { background: #12151c; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }

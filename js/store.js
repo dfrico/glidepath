@@ -41,6 +41,7 @@ export function loadSettings() {
     futureIncome: s.futureIncome ?? 0,
     futureIncomeMonths: s.futureIncomeMonths ?? null,
     excludedMonths: s.excludedMonths ?? [],
+    budgetMonth: s.budgetMonth ?? null,
   };
 }
 export function saveSettings(v) { write(K.settings, v); }

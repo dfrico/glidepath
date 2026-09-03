@@ -8,6 +8,7 @@ import { monthMatrix, topExpenses, recurringCommitments } from './analysis.js';
 import { project } from './forecast.js';
 import { renderOverview, renderCategories } from './dashboard.js';
 import { renderTransactions } from './transactions.js';
+import { renderBudget } from './budget-view.js';
 
 const state = {
   transactions: store.loadTransactions(),
@@ -15,11 +16,13 @@ const state = {
   catSettings: store.loadCategorySettings(),
   settings: store.loadSettings(),
   filters: { q: '', month: '', category: '', untaggedOnly: false },
+  budgetSort: { key: 'amount', dir: 'asc' },
 };
 
 const dom = {
   empty: document.getElementById('empty'),
   overview: document.getElementById('overview'),
+  budget: document.getElementById('budget'),
   categories: document.getElementById('categories'),
   transactions: document.getElementById('transactions'),
   tabs: document.getElementById('tabs'),
@@ -151,6 +154,13 @@ const dashCb = {
     state.filters.untaggedOnly = true;
     showTab('transactions');
   },
+  onBudgetMonth: (m) => { updateSettings({ budgetMonth: m }); renderBudgetPanel(); },
+  onBudgetSort: (key) => {
+    const s = state.budgetSort;
+    if (s.key === key) s.dir = s.dir === 'asc' ? 'desc' : 'asc';
+    else { s.key = key; s.dir = 'asc'; }
+    renderBudgetPanel();
+  },
 };
 
 const txCb = {
@@ -241,6 +251,11 @@ function renderOverviewPanel() {
   renderOverview(dom.overview, budget, matrix, tops, recurring, forecast, state.settings, dashCb);
 }
 
+function renderBudgetPanel() {
+  const budget = computeBudget(state.transactions, state.catSettings, state.settings);
+  renderBudget(dom.budget, state.transactions, budget, state.settings, state.budgetSort, dashCb);
+}
+
 function renderCategoriesPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
   renderCategories(dom.categories, { budget, rules: state.rules }, dashCb);
@@ -256,6 +271,7 @@ function renderAll() {
   dom.tabs.hidden = !has;
   if (!has) {
     dom.overview.hidden = true;
+    dom.budget.hidden = true;
     dom.categories.hidden = true;
     dom.transactions.hidden = true;
     dom.range.textContent = '';
@@ -264,6 +280,7 @@ function renderAll() {
   const months = [...new Set(state.transactions.map(monthKey).filter(Boolean))].sort();
   dom.range.textContent = months.length ? `${months[0]} to ${months[months.length - 1]} · ${state.transactions.length} transactions` : '';
   renderOverviewPanel();
+  renderBudgetPanel();
   renderCategoriesPanel();
   renderTransactionsPanel();
   const current = dom.tabs.querySelector('.tab.active');
@@ -275,6 +292,7 @@ function renderAll() {
 function showTab(name) {
   for (const btn of dom.tabs.querySelectorAll('.tab')) btn.classList.toggle('active', btn.dataset.tab === name);
   dom.overview.hidden = name !== 'overview';
+  dom.budget.hidden = name !== 'budget';
   dom.categories.hidden = name !== 'categories';
   dom.transactions.hidden = name !== 'transactions';
   if (name === 'transactions') renderTransactionsPanel();

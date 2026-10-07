@@ -19,9 +19,10 @@ export function renderOverview(root, b, matrix, tops, recurring, forecast, setti
   parts.push(planCard(b, settings, cb));
   parts.push(forecastCard(forecast, settings, cb));
   parts.push(matrixCard(matrix, cb));
-  const rec = recurringCard(recurring);
+  const skipped = ignoredNote(b);
+  const rec = recurringCard(recurring, skipped);
   if (rec) parts.push(rec);
-  parts.push(topCard(tops, cb));
+  parts.push(topCard(tops, skipped, cb));
   const cuts = cutCandidates(b);
   if (cuts) parts.push(cuts);
   root.replaceChildren(...parts);
@@ -221,7 +222,16 @@ function forecastTable(proj) {
 
 // ---- Recurring commitments ------------------------------------------------
 
-function recurringCard(rec) {
+// " (excluding Savings and One-off)" — the ignored categories that actually
+// have expenses, so the note follows the Ignore toggles in Categories.
+function ignoredNote(b) {
+  const names = b.categories.filter((c) => c.ignore && c.count > 0).map((c) => c.name);
+  if (!names.length) return '';
+  const list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  return ` (excluding ${list})`;
+}
+
+function recurringCard(rec, skipped) {
   if (!rec.length) return null;
   const totalMo = rec.reduce((a, r) => a + r.monthly, 0);
   const cancMo = rec.filter((r) => r.cancelable).reduce((a, r) => a + r.monthly, 0);
@@ -238,7 +248,7 @@ function recurringCard(rec) {
   ]));
   return el('div', { class: 'card' }, [
     el('h3', { text: 'Recurring commitments' }),
-    el('p', { class: 'muted', text: `Payments that repeat most months: about ${eur.format(totalMo)} per month, of which ${eur.format(cancMo)} is optional and could be cut.` }),
+    el('p', { class: 'muted', text: `Payments that repeat most months${skipped}: about ${eur.format(totalMo)} per month, of which ${eur.format(cancMo)} is optional and could be cut.` }),
     table(['Partner', 'Category', '€/mo', '€/yr', 'Seen'], rows),
   ]);
 }
@@ -316,7 +326,7 @@ function catRow(c, months, excluded, maxCell, muted) {
 }
 
 // Top single expenses, as magnitude bars (label carries identity).
-function topCard(tops, cb) {
+function topCard(tops, skipped, cb) {
   if (!tops.length) return el('div');
   const max = Math.max(...tops.map((t) => t.amount), 1);
   const rows = tops.map((t) => el('div', {
@@ -335,7 +345,7 @@ function topCard(tops, cb) {
   ]));
   return el('div', { class: 'card' }, [
     el('h3', { text: 'Top single expenses' }),
-    el('p', { class: 'muted', text: 'Your biggest one-off payments. Click one to find it in Transactions.' }),
+    el('p', { class: 'muted', text: `Your biggest single payments${skipped}. Click one to find it in Transactions.` }),
     el('div', { class: 'top-list' }, rows),
   ]);
 }

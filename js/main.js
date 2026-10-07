@@ -253,9 +253,10 @@ function buildForecast(budget) {
 function renderOverviewPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
   const matrix = monthMatrix(state.transactions, state.settings.excludedMonths);
-  const tops = topExpenses(state.transactions, 12, state.settings.excludedMonths);
   const essentialNames = budget.categories.filter((c) => c.essential && !c.ignore).map((c) => c.name);
-  const recurring = recurringCommitments(state.transactions, essentialNames);
+  const ignoredNames = budget.categories.filter((c) => c.ignore).map((c) => c.name);
+  const tops = topExpenses(state.transactions, 12, state.settings.excludedMonths, ignoredNames);
+  const recurring = recurringCommitments(state.transactions, essentialNames, ignoredNames);
   const forecast = buildForecast(budget);
   renderOverview(dom.overview, budget, matrix, tops, recurring, forecast, state.settings, dashCb);
 }

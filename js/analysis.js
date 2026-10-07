@@ -1,6 +1,8 @@
 // Turns transactions into the views that help you budget:
 // a category-by-month matrix, and your biggest single expenses.
 // All figures respect the excluded months (e.g. the wedding month).
+// Top expenses and recurring commitments skip ignored categories (Savings,
+// One-off): moving money to savings is not a cost you can cut.
 
 import { monthKey } from './budget.js';
 
@@ -82,11 +84,13 @@ function emptyRow(months) {
 
 // Payments that repeat across several months from the same partner.
 // These are your recurring commitments — the easiest, highest-leverage cuts.
-export function recurringCommitments(transactions, essentialNames) {
+export function recurringCommitments(transactions, essentialNames, ignoredNames) {
   const essential = new Set(essentialNames || []);
+  const ignored = new Set(ignoredNames || []);
   const map = new Map();
   for (const t of transactions) {
     if (t.amount >= 0) continue;
+    if (ignored.has(t.category)) continue;
     const key = (t.partnerName || '').toUpperCase().trim();
     if (!key) continue;
     if (!map.has(key)) map.set(key, { name: t.partnerName || key, months: new Set(), amounts: [], catCount: {} });
@@ -120,10 +124,11 @@ export function recurringCommitments(transactions, essentialNames) {
   return out.sort((a, b) => b.monthly - a.monthly);
 }
 
-export function topExpenses(transactions, n, excludedMonths) {
+export function topExpenses(transactions, n, excludedMonths, ignoredNames) {
   const excluded = new Set(excludedMonths || []);
+  const ignored = new Set(ignoredNames || []);
   return transactions
-    .filter((t) => t.amount < 0)
+    .filter((t) => t.amount < 0 && !ignored.has(t.category))
     .map((t) => ({
       id: t.id,
       date: t.bookingDate || '',

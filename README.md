@@ -45,8 +45,9 @@ block when you open the file directly with `file://`.)
     to keep it out of the averages.
   - Recurring commitments: payments that repeat most months, with their yearly
     cost. The optional ones are flagged "cut?" — your easiest savings.
-  - Top single expenses: your biggest one-off payments. Click one to find it
-    in Transactions.
+    Ignored categories (Savings, One-off) are left out.
+  - Top single expenses: your biggest single payments, leaving out ignored
+    categories (Savings, One-off). Click one to find it in Transactions.
   - Where to cut: your biggest optional costs per month.
 - Budget — am I on track this month?
   - Pick a month (defaults to the latest). A donut shows where the money went,

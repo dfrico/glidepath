@@ -322,7 +322,7 @@ function topCard(tops, cb) {
   const rows = tops.map((t) => el('div', {
     class: 'top-row' + (t.excluded ? ' off' : ''),
     title: 'Click to find this partner in Transactions',
-    onclick: () => cb.onFocusPartner(t.partner),
+    onclick: () => cb.onFocusPartner(t.partner, t.month),
   }, [
     el('div', { class: 'top-bar-wrap' }, [
       el('div', { class: 'top-bar', style: `width:${(t.amount / max * 100).toFixed(1)}%` }),

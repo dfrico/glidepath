@@ -7,7 +7,7 @@ import { computeBudget, monthKey, addMonths } from './budget.js';
 import { monthMatrix, topExpenses, recurringCommitments } from './analysis.js';
 import { project } from './forecast.js';
 import { renderOverview, renderCategories } from './dashboard.js';
-import { renderTransactions } from './transactions.js';
+import { renderTransactions, smallestPeriodFor } from './transactions.js';
 import { renderBudget } from './budget-view.js';
 
 const state = {
@@ -15,7 +15,7 @@ const state = {
   rules: store.loadRules(),
   catSettings: store.loadCategorySettings(),
   settings: store.loadSettings(),
-  filters: { q: '', month: '', category: '', untaggedOnly: false },
+  filters: { period: '3', q: '', month: '', category: '', untaggedOnly: false },
   budgetSort: { key: 'amount', dir: 'asc' },
 };
 
@@ -149,9 +149,14 @@ const dashCb = {
   onRuleChange: (idx, category) => { if (state.rules[idx]) { state.rules[idx].category = category; afterRulesChange(); } },
   onRuleDelete: (idx) => { state.rules.splice(idx, 1); afterRulesChange(); },
   onRuleAdd: (rule) => { state.rules.unshift(rule); afterRulesChange(); },
-  onFocusPartner: (partner) => {
+  onFocusPartner: (partner, month) => {
     state.filters.q = partner;
     state.filters.untaggedOnly = false;
+    state.filters.month = '';
+    // Widen the period only as far as needed to show this expense.
+    const needed = smallestPeriodFor(state.transactions, month);
+    const order = ['3', '12', 'all'];
+    if (order.indexOf(needed) > order.indexOf(state.filters.period)) state.filters.period = needed;
     showTab('transactions');
   },
   gotoUntagged: () => {
@@ -292,7 +297,8 @@ function renderAll() {
   renderOverviewPanel();
   renderBudgetPanel();
   renderCategoriesPanel();
-  renderTransactionsPanel();
+  // Transactions is drawn by showTab, and only while it is the active tab:
+  // drawing it here too doubled the cost of every tag.
   const current = dom.tabs.querySelector('.tab.active');
   showTab(current ? current.dataset.tab : 'overview');
 }

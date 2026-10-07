@@ -2,24 +2,56 @@
 // Tagging is a native dropdown, so you can click it and type the first letters.
 // With "Learn" on, tagging one row also tags every other untagged row from the
 // same partner and remembers it for future imports.
+//
+// The list shows the last 3 months by default: years of rows (each with its own
+// category dropdown) make rendering and tagging slow. All the data still feeds
+// the averages elsewhere; this only limits what is listed.
 
 import { el, eur2, table } from './dom.js';
 import { CATEGORY_NAMES } from './categories.js';
+import { addMonths } from './budget.js';
+
+// Period options. Counted back from the latest month in the data, not today,
+// so an import that ends last month still shows 3 full months.
+const PERIODS = [
+  { value: '3', label: 'Last 3 months' },
+  { value: '12', label: 'Last 12 months' },
+  { value: 'all', label: 'All time' },
+];
 
 export function renderTransactions(root, transactions, filters, settings, cb) {
   const listWrap = el('div', {});
   const count = el('span', { class: 'muted count' });
 
+  const allMonths = monthsOf(transactions);
+  const fromMonth = periodStart(allMonths, filters.period);
+  const months = allMonths.filter((m) => m >= fromMonth);
+  if (filters.month && !months.includes(filters.month)) filters.month = '';
+
   function draw() {
-    const filtered = byDateDesc(applyFilters(transactions, filters));
+    const filtered = byDateDesc(applyFilters(transactions, filters, fromMonth));
     listWrap.replaceChildren(txTable(filtered, cb));
-    count.textContent = `${filtered.length} shown · ${transactions.length} total`;
+    // Say when the period hides rows that match, so they never seem lost.
+    // Filtering is cheap; only drawing rows is slow.
+    const hidden = fromMonth ? applyFilters(transactions, filters, '').length - filtered.length : 0;
+    count.textContent = `${filtered.length} shown` + (hidden > 0 ? ` · ${hidden} more in older months` : '') + ` · ${transactions.length} total`;
   }
+
+  // Changing the period also changes which months the month filter offers.
+  const periodSel = el('select', { class: 'sel' }, PERIODS.map((p) => {
+    const o = el('option', { value: p.value, text: p.label });
+    if (p.value === filters.period) o.selected = true;
+    return o;
+  }));
+  periodSel.addEventListener('change', () => {
+    filters.period = periodSel.value;
+    renderTransactions(root, transactions, filters, settings, cb);
+  });
 
   const search = el('input', { id: 'txSearch', type: 'search', class: 'search', placeholder: 'Search partner or reference…', value: filters.q });
   search.addEventListener('input', () => { filters.q = search.value; draw(); });
 
-  const monthSel = selectFilter(monthsOf(transactions), filters.month, 'All months', (v) => { filters.month = v; draw(); });
+  const monthSel = selectFilter(months.slice().reverse(), filters.month, 'All months', (v) => { filters.month = v; draw(); });
   const catSel = selectFilter(CATEGORY_NAMES, filters.category, 'All categories', (v) => { filters.category = v; draw(); });
 
   const untagged = el('input', { type: 'checkbox' });
@@ -31,6 +63,7 @@ export function renderTransactions(root, transactions, filters, settings, cb) {
   learn.addEventListener('change', () => cb.onLearn(learn.checked));
 
   const toolbar = el('div', { class: 'toolbar' }, [
+    periodSel,
     search,
     monthSel,
     catSel,
@@ -66,9 +99,28 @@ function monthsOf(transactions) {
   return [...set].sort();
 }
 
-function applyFilters(transactions, f) {
+// The shortest period that still shows month `ym`, so jumping to an old
+// expense works without listing everything.
+export function smallestPeriodFor(transactions, ym) {
+  const months = monthsOf(transactions);
+  for (const p of PERIODS) {
+    const from = periodStart(months, p.value);
+    if (!from || !ym || ym >= from) return p.value;
+  }
+  return 'all';
+}
+
+// First month of the chosen period ('' = no limit).
+function periodStart(months, period) {
+  const n = Number(period);
+  if (!n || !months.length) return '';
+  return addMonths(months[months.length - 1], -(n - 1));
+}
+
+function applyFilters(transactions, f, fromMonth) {
   const q = f.q.trim().toUpperCase();
   return transactions.filter((t) => {
+    if (fromMonth && (t.bookingDate || '').slice(0, 7) < fromMonth) return false;
     if (f.untaggedOnly && (t.category || t.amount > 0)) return false;
     if (f.month && (t.bookingDate || '').slice(0, 7) !== f.month) return false;
     if (f.category && t.category !== f.category) return false;

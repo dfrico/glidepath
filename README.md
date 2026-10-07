@@ -20,7 +20,8 @@ block when you open the file directly with `file://`.)
 
 1. Drop your bank CSV on the page, or click "Import CSV".
 2. The app auto-tags known merchants and opens on Overview.
-3. Go to Transactions, filter to "Untagged only", and tag the rest.
+3. Go to Transactions, filter to "Untagged only", and tag the rest (pick
+   "All time" to see untagged rows older than 3 months).
    With "Learn" on, tagging one row also tags every other row from the same
    partner (except rows you tagged by hand) and remembers it for next time.
    Rules match whole words: a "SHELL" rule tags "SHELL 1234" but not
@@ -52,7 +53,6 @@ block when you open the file directly with `file://`.)
     with the percent of the total budget spent in the middle.
   - By category: one bar per category, filled to the percent of its budget
     spent. Bars past full turn red. Essentials are listed first.
-  - The month's transactions, sortable by any column (read-only — tag them in
   - Yearly costs: bills that come once a year (Annual categories, e.g. property
     tax, car insurance). Each shows what you paid in the last 12 months against
     its yearly cost, when it was last paid, and when the next bill is likely
@@ -60,6 +60,7 @@ block when you open the file directly with `file://`.)
     monthly set-aside (yearly / 12), not the bill itself, so a yearly bill does
     not wreck the month. A line under the total shows any yearly bills paid
     that month.
+  - The month's transactions, sortable by any column (read-only — tag them in
     Transactions).
   - The budget comes from your Budget plan on Overview: the total is the
     "You can spend" cap. Essentials keep their typical-month figure, fixed
@@ -72,8 +73,13 @@ block when you open the file directly with `file://`.)
   - Ignore drops a category from all spending totals (default on for Savings),
     so transfers to yourself do not count as spending.
   - Auto-tag rules: view, edit, or delete the rules the app learned.
-- Transactions — the full list, most recent first, with filter, search, and
-  fast tagging.
+- Transactions — the list, most recent first, with filter, search, and fast
+  tagging. It shows the last 3 months by default (counted back from your
+  latest month of data) to stay fast; switch to Last 12 months or All time.
+  This only limits the list: every month still counts in the averages, and
+  Learn and auto-tag still work on all your data. The count line tells you
+  when matching rows sit in older months. Clicking a top expense on Overview
+  widens the period only if that expense is older than it.
 
 ## Keep your work safe
 

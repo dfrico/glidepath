@@ -7,9 +7,14 @@
 // one chosen month against that budget: a donut of where the money went, a bar
 // per category filled to the percent spent, and the month's transactions
 // (read-only — tag them over in Transactions).
+//
+// Annual categories (property tax, car insurance) are billed once a year, so
+// a monthly bar would read 1000% one month and 0% the rest. In the month's total
+// they count as their monthly set-aside (yearly / 12) instead of the bill, and
+// get their own "Yearly costs" card tracked over the last 12 months.
 
 import { el, eur, eur2 } from './dom.js';
-import { monthKey, categoryBudgets } from './budget.js';
+import { monthKey, categoryBudgets, yearlyCosts } from './budget.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -37,7 +42,7 @@ export function trackMonth(transactions, budgetRows, budgets, month) {
   budgetRows.forEach((r, i) => {
     byCat[r.name] = {
       name: r.name, budget: budgets[r.name] ?? r.monthly, essential: r.essential, ignore: r.ignore,
-      spent: 0, count: 0, color: catColor(i),
+      annual: r.annual, spent: 0, count: 0, color: catColor(i),
     };
   });
 
@@ -60,12 +65,16 @@ export function trackMonth(transactions, budgetRows, budgets, month) {
     .filter((c) => !c.ignore && (c.budget > 0 || c.spent > 0));
   for (const c of cats) {
     c.pct = c.budget > 0 ? c.spent / c.budget : (c.spent > 0 ? Infinity : 0);
+    // What this category adds to the month's total: the set-aside for yearly
+    // bills, the actual spend for everything else.
+    c.counted = c.annual ? c.budget : c.spent;
   }
 
   const totalBudget = cats.reduce((a, c) => a + c.budget, 0);
-  const totalSpent = cats.reduce((a, c) => a + c.spent, 0);
+  const totalSpent = cats.reduce((a, c) => a + c.counted, 0);
+  const yearlyBilled = cats.filter((c) => c.annual).reduce((a, c) => a + c.spent, 0);
 
-  return { month, cats, txs, untaggedSpent, totalBudget, totalSpent };
+  return { month, cats, txs, untaggedSpent, totalBudget, totalSpent, yearlyBilled };
 }
 
 export function renderBudget(root, transactions, budget, settings, sort, cb) {
@@ -75,11 +84,13 @@ export function renderBudget(root, transactions, budget, settings, sort, cb) {
   const month = months.includes(settings.budgetMonth) ? settings.budgetMonth : months[months.length - 1];
   const budgets = categoryBudgets(budget);
   const data = trackMonth(transactions, budget.categories, budgets.byName, month);
+  const yearly = yearlyCosts(transactions, budget.categories, budgets.byName, month);
 
   root.replaceChildren(
     header(months, month, cb),
     summaryCard(data, budget.plan),
     breakdownCard(data),
+    yearly.length ? yearlyCard(yearly, data) : null,
     txCard(data, sort, cb),
   );
 }
@@ -104,13 +115,16 @@ function summaryCard(d, plan) {
   const pctText = d.totalBudget > 0 ? Math.round(overall * 100) + '%' : '—';
   const cls = overall > 1 ? 'neg' : 'pos';
 
-  const withSpend = d.cats.filter((c) => c.spent > 0).sort((a, b) => b.spent - a.spent);
+  const withSpend = d.cats.filter((c) => c.counted > 0).sort((a, b) => b.counted - a.counted);
   const legend = el('div', { class: 'donut-legend' }, withSpend.map((c) => el('div', { class: 'legend-row' }, [
     el('span', { class: 'legend-dot', style: `background:${c.color}` }),
-    el('span', { class: 'legend-name', text: c.name }),
-    el('span', { class: 'legend-val num muted', text: eur.format(c.spent) }),
+    el('span', { class: 'legend-name' }, [c.name, c.annual ? el('span', { class: 'muted', text: ' · set aside' }) : null]),
+    el('span', { class: 'legend-val num muted', text: eur.format(c.counted) }),
   ])));
 
+  const yearlyNote = d.yearlyBilled > 0
+    ? el('p', { class: 'muted small', text: `+ ${eur.format(d.yearlyBilled)} of yearly bills paid this month, from the yearly pot (see Yearly costs). The total above counts their monthly set-aside instead.` })
+    : null;
   const note = d.untaggedSpent > 0
     ? el('p', { class: 'muted small', text: `${eur.format(d.untaggedSpent)} of this month's spend is untagged and not counted here. Tag it in Transactions.` })
     : null;
@@ -123,6 +137,7 @@ function summaryCard(d, plan) {
       legend,
     ]),
     el('p', { class: 'muted', text: `Spent ${eur.format(d.totalSpent)} of a ${eur.format(d.totalBudget)} budget this month.` }),
+    yearlyNote,
     note,
   ]);
 }
@@ -145,9 +160,9 @@ function donutSvg(cats, totalSpent, centerPct, centerCls) {
   let offset = 0;
   let segs = '';
   for (const c of cats) {
-    const len = (c.spent / total) * C;
+    const len = (c.counted / total) * C;
     segs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c.color}" stroke-width="26" `
-      + `stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"><title>${c.name}: ${eur.format(c.spent)}</title></circle>`;
+      + `stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"><title>${c.name}: ${eur.format(c.counted)}</title></circle>`;
     offset += len;
   }
   if (!cats.length) {
@@ -163,8 +178,9 @@ function donutSvg(cats, totalSpent, centerPct, centerCls) {
 
 // One bar per category, filled to the percent of budget spent.
 function breakdownCard(d) {
-  // Essentials first, then optional. Within each group, biggest budget first.
-  const cats = d.cats.slice().sort((a, b) =>
+  // Yearly bills live in their own card. Essentials first, then optional.
+  // Within each group, biggest budget first.
+  const cats = d.cats.filter((c) => !c.annual).sort((a, b) =>
     (b.essential - a.essential) || (b.budget - a.budget));
   const rows = cats.map((c) => {
     const over = c.pct > 1;
@@ -198,6 +214,56 @@ function breakdownCard(d) {
     el('p', { class: 'muted', text: 'How much of each budget you have spent this month. Bars past full turn red for over budget.' }),
     el('div', { class: 'bud-list' }, rows),
   ]);
+}
+
+// Yearly bills over the 12 months ending at the tracked month: paid vs the
+// yearly budget, and when the next bill is likely due.
+function yearlyCard(items, d) {
+  const colorOf = Object.fromEntries(d.cats.map((c) => [c.name, c.color]));
+  const rows = items.map((y) => {
+    const pct = y.yearly > 0 ? y.paid / y.yearly : (y.paid > 0 ? Infinity : 0);
+    const over = pct > 1.05; // a little slack: bills rise a bit year to year
+    const fill = Math.min(pct, 1) * 100;
+    const overFill = over && y.yearly > 0 ? Math.min(pct - 1, 1) * 100 : 0;
+    const color = colorOf[y.name] || 'var(--accent)';
+    const { text: when, soon } = dueText(y);
+
+    return el('div', { class: 'bud-row' + (over ? ' over' : '') }, [
+      el('div', { class: 'bud-top' }, [
+        el('span', { class: 'bud-name' }, [
+          el('span', { class: 'legend-dot', style: `background:${color}` }),
+          y.name,
+          y.essential ? el('span', { class: 'tag', text: 'essential' }) : null,
+          soon ? el('span', { class: 'tag cut', text: 'due soon' }) : null,
+        ]),
+        el('span', { class: 'bud-figs num' }, [
+          el('strong', { text: eur.format(y.paid) }),
+          el('span', { class: 'muted', text: ' paid / ' + eur.format(y.yearly) + ' a year' }),
+        ]),
+      ]),
+      el('div', { class: 'bud-track' }, [
+        el('div', { class: 'bud-fill', style: `width:${fill.toFixed(1)}%;background:${color}` }),
+        overFill > 0 ? el('div', { class: 'bud-over', style: `width:${overFill.toFixed(1)}%` }) : null,
+      ]),
+      el('div', { class: 'muted small', text: `${when} · set aside ${eur.format(y.monthly)} / mo` }),
+    ]);
+  });
+
+  return el('div', { class: 'card' }, [
+    el('h3', { text: 'Yearly costs' }),
+    el('p', { class: 'muted', text: `Bills that come once a year. What you paid in the 12 months to ${monthLabel(d.month)}, against the yearly budget. The monthly total above counts their set-aside, not the bill.` }),
+    el('div', { class: 'bud-list' }, rows),
+  ]);
+}
+
+function dueText(y) {
+  if (!y.nextDue) return { text: 'no bill seen yet', soon: false };
+  const next = monthLabel(y.nextDue);
+  const last = monthLabel(y.lastPaid.slice(0, 7));
+  if (y.paidThisMonth > 0) return { text: `paid this month · next ~${next}`, soon: false };
+  if (y.dueIn <= 0) return { text: `expected ~${next}, not seen yet · last paid ${last}`, soon: true };
+  const soon = y.dueIn <= 2;
+  return { text: `last paid ${last} · next ~${next} (in ${y.dueIn} mo)`, soon };
 }
 
 // The month's transactions, sortable, read-only (tag them in Transactions).

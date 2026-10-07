@@ -53,6 +53,13 @@ block when you open the file directly with `file://`.)
   - By category: one bar per category, filled to the percent of its budget
     spent. Bars past full turn red. Essentials are listed first.
   - The month's transactions, sortable by any column (read-only — tag them in
+  - Yearly costs: bills that come once a year (Annual categories, e.g. property
+    tax, car insurance). Each shows what you paid in the last 12 months against
+    its yearly cost, when it was last paid, and when the next bill is likely
+    due ("due soon" within 2 months). In the month's total these count as their
+    monthly set-aside (yearly / 12), not the bill itself, so a yearly bill does
+    not wreck the month. A line under the total shows any yearly bills paid
+    that month.
     Transactions).
   - The budget comes from your Budget plan on Overview: the total is the
     "You can spend" cap. Essentials keep their typical-month figure, fixed
@@ -81,6 +88,7 @@ browser). This protects the time you spend tagging.
 - Runway at current spend = cash on hand ÷ average monthly spend.
 - Budget plan cap = cash on hand ÷ target months. Room for optional = cap minus
   essentials.
+- Annual categories = what you paid in the last 12 months of data ÷ 12.
 
 ## Files
 

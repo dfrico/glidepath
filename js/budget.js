@@ -3,9 +3,9 @@
 //
 // Outlier months (e.g. your wedding month) can be excluded from the averages.
 // They stay in the transaction list, but do not skew the "typical month" figures.
-// Annual categories are spread as a yearly cost: total / months of data, with at
-// least 12 months, so 18 months holding two yearly bills still gives one bill / 12.
-// Exclusions do not apply to them.
+// Annual categories are spread as a yearly cost: what was paid in the last 12
+// months of data, / 12. So 18 months holding two yearly bills still gives one
+// bill / 12, and a price rise shows up. Exclusions do not apply to them.
 
 import { CATEGORIES } from './categories.js';
 
@@ -47,7 +47,8 @@ export function computeBudget(transactions, catSettings, settings) {
 
   // Per-category totals. "total" is all-time; "included" only counts kept months.
   const cats = {};
-  for (const c of CATEGORIES) cats[c.name] = { total: 0, included: 0, count: 0 };
+  for (const c of CATEGORIES) cats[c.name] = { total: 0, included: 0, last12: 0, count: 0 };
+  const yearStart = months.length ? addMonths(months[months.length - 1], -11) : '';
   let untaggedIncluded = 0;
   let untaggedCount = 0;
 
@@ -61,10 +62,11 @@ export function computeBudget(transactions, catSettings, settings) {
       if (inMonth) untaggedIncluded += spend;
       continue;
     }
-    if (!cats[cat]) cats[cat] = { total: 0, included: 0, count: 0 };
+    if (!cats[cat]) cats[cat] = { total: 0, included: 0, last12: 0, count: 0 };
     cats[cat].total += spend;
     cats[cat].count++;
     if (inMonth) cats[cat].included += spend;
+    if (monthKey(t) >= yearStart) cats[cat].last12 += spend;
   }
 
   const rows = [];
@@ -73,7 +75,7 @@ export function computeBudget(transactions, catSettings, settings) {
   for (const c of CATEGORIES) {
     const s = catSettings[c.name];
     const agg = cats[c.name];
-    const monthly = monthlyBudget(agg, s, includedCount, months.length);
+    const monthly = monthlyBudget(agg, s, includedCount);
     rows.push({
       name: c.name,
       total: agg.total,
@@ -155,7 +157,7 @@ export function computeBudget(transactions, catSettings, settings) {
 
 function monthlyBudget(agg, s, includedCount, monthsOfData) {
   if (s.budgetOverride != null) return s.budgetOverride;
-  if (s.annual) return agg.total / Math.max(monthsOfData, 12); // yearly cost, spread evenly
+  if (s.annual) return agg.last12 / 12; // yearly cost, spread evenly
   return agg.included / includedCount; // typical month
 }
 
@@ -184,4 +186,51 @@ export function categoryBudgets(b) {
     out[c.name] = c.monthly * scale;
   }
   return { byName: out, fromPlan: true, scale };
+}
+
+// Whole months from a to b: monthsBetween("2026-02", "2027-02") = 12.
+export function monthsBetween(a, b) {
+  const [ay, am] = a.split('-').map(Number);
+  const [by, bm] = b.split('-').map(Number);
+  return (by - ay) * 12 + (bm - am);
+}
+
+// Yearly costs (annual categories) for the Budget tab. A yearly bill lands in
+// one month, so a monthly bar is useless for it. Instead, track it over the 12
+// months ending at `month`: what was actually paid against the yearly budget,
+// and when the next bill is likely due (the last bill's month, a year on).
+export function yearlyCosts(transactions, budgetRows, budgets, month) {
+  const start = addMonths(month, -11);
+  const out = [];
+  for (const r of budgetRows) {
+    if (!r.annual || r.ignore) continue;
+    const yearly = (budgets[r.name] ?? r.monthly) * 12;
+    let paid = 0;
+    let paidThisMonth = 0;
+    let lastPaid = null;
+    for (const t of transactions) {
+      if (t.amount >= 0 || t.category !== r.name) continue;
+      const m = monthKey(t);
+      if (!m || m > month) continue; // nothing after the tracked month
+      if (m >= start) paid += -t.amount;
+      if (m === month) paidThisMonth += -t.amount;
+      const d = t.bookingDate || t.valueDate;
+      if (!lastPaid || d > lastPaid) lastPaid = d;
+    }
+    if (yearly <= 0 && paid <= 0) continue;
+    const nextDue = lastPaid ? addMonths(lastPaid.slice(0, 7), 12) : null;
+    out.push({
+      name: r.name,
+      essential: r.essential,
+      yearly,
+      monthly: yearly / 12,
+      paid,
+      paidThisMonth,
+      lastPaid,
+      nextDue,
+      dueIn: nextDue ? monthsBetween(month, nextDue) : null,
+    });
+  }
+  // Soonest bill first; never-seen bills last.
+  return out.sort((a, b) => (a.dueIn ?? Infinity) - (b.dueIn ?? Infinity));
 }

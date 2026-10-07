@@ -24,7 +24,7 @@ No build, no dependencies, no tests — verify changes in the browser.
 - Dates are ISO strings (`YYYY-MM-DD`); months are `YYYY-MM` via `monthKey()`.
   Expenses are negative amounts.
 - Semantics to respect everywhere: excluded months stay out of averages;
-  `annual` categories are total / max(months of data, 12); `ignore` categories (Savings, Income,
+  `annual` categories are (paid in last 12 months of data) / 12; `ignore` categories (Savings, Income,
   One-off) are not spending; `budgetOverride` replaces the computed monthly.
   Manual tags are never overwritten by rules; the first matching rule wins;
   rules match whole words (`containsWord` in `tagging.js`), not raw substrings.

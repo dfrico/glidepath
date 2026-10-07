@@ -1,13 +1,15 @@
 // The Budget tab: track this month's spend against your typical-month budget.
 //
-// The budget for each category is the "monthly" figure computed for the runway
-// (typical month, annual/12, or a fixed override). Here we compare the spend of
+// With a budget plan (cash + target months), the total budget is the plan's
+// monthly cap, shared out by categoryBudgets(). Without one, each category's
+// budget is its typical-month figure (or annual/12, or a fixed override).
+// Here we compare the spend of
 // one chosen month against that budget: a donut of where the money went, a bar
 // per category filled to the percent spent, and the month's transactions
 // (read-only — tag them over in Transactions).
 
 import { el, eur, eur2 } from './dom.js';
-import { monthKey } from './budget.js';
+import { monthKey, categoryBudgets } from './budget.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -30,11 +32,11 @@ function monthLabel(ym) {
 }
 
 // Build the per-category comparison for one month, plus that month's rows.
-export function trackMonth(transactions, budgetRows, month) {
+export function trackMonth(transactions, budgetRows, budgets, month) {
   const byCat = {};
   budgetRows.forEach((r, i) => {
     byCat[r.name] = {
-      name: r.name, budget: r.monthly, essential: r.essential, ignore: r.ignore,
+      name: r.name, budget: budgets[r.name] ?? r.monthly, essential: r.essential, ignore: r.ignore,
       spent: 0, count: 0, color: catColor(i),
     };
   });
@@ -71,11 +73,12 @@ export function renderBudget(root, transactions, budget, settings, sort, cb) {
   if (!months.length) { root.replaceChildren(el('p', { class: 'muted', text: 'No months of data yet.' })); return; }
 
   const month = months.includes(settings.budgetMonth) ? settings.budgetMonth : months[months.length - 1];
-  const data = trackMonth(transactions, budget.categories, month);
+  const budgets = categoryBudgets(budget);
+  const data = trackMonth(transactions, budget.categories, budgets.byName, month);
 
   root.replaceChildren(
     header(months, month, cb),
-    summaryCard(data),
+    summaryCard(data, budget.plan),
     breakdownCard(data),
     txCard(data, sort, cb),
   );
@@ -96,7 +99,7 @@ function header(months, month, cb) {
 }
 
 // Donut of where the money went, with the month's spend vs budget in the hole.
-function summaryCard(d) {
+function summaryCard(d, plan) {
   const overall = d.totalBudget > 0 ? d.totalSpent / d.totalBudget : 0;
   const pctText = d.totalBudget > 0 ? Math.round(overall * 100) + '%' : '—';
   const cls = overall > 1 ? 'neg' : 'pos';
@@ -114,6 +117,7 @@ function summaryCard(d) {
 
   return el('div', { class: 'card' }, [
     el('h3', { text: `Spend vs budget · ${monthLabel(d.month)}` }),
+    budgetSource(plan, d.totalBudget),
     el('div', { class: 'donut-wrap' }, [
       el('div', { class: 'donut', html: donutSvg(withSpend, d.totalSpent, pctText, cls) }),
       legend,
@@ -121,6 +125,17 @@ function summaryCard(d) {
     el('p', { class: 'muted', text: `Spent ${eur.format(d.totalSpent)} of a ${eur.format(d.totalBudget)} budget this month.` }),
     note,
   ]);
+}
+
+// Where the budget number comes from, so it matches the Overview plan.
+function budgetSource(plan, totalBudget) {
+  if (!plan) {
+    return el('p', { class: 'muted small', text: 'Budget = your typical month per category. Set cash and a target in Overview → Budget plan to budget against that cap instead.' });
+  }
+  const text = totalBudget > plan.allowedMonthly + 0.5
+    ? `Budget plan: ${eur.format(plan.allowedMonthly)} / mo to last ${plan.targetMonths} months — but essentials alone are ${eur.format(plan.essentials)}, so optional categories get nothing.`
+    : `Budget plan: ${eur.format(plan.allowedMonthly)} / mo to last ${plan.targetMonths} months. Essentials keep their typical figure; optional categories share the rest.`;
+  return el('p', { class: 'muted small', text });
 }
 
 function donutSvg(cats, totalSpent, centerPct, centerCls) {

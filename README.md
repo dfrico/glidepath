@@ -1,6 +1,7 @@
 # Expense budget
 
-A small local web app to budget your expenses and find your runway.
+A small local web app to budget your expenses and see whether you are on track.
+It also has a runway mode for when you have no income: how long will your cash last?
 It runs fully in your browser. Your bank data stays on your machine — nothing is uploaded.
 
 ## Run it
@@ -20,10 +21,12 @@ block when you open the file directly with `file://`.)
 1. Drop your bank CSV on the page, or click "Import CSV".
 2. The app auto-tags known merchants and opens on Overview.
 3. Go to Transactions, filter to "Untagged only", and tag the rest.
-   With "Learn" on, tagging one row tags every untagged row from the same
-   partner and remembers it for next time.
+   With "Learn" on, tagging one row also tags every other row from the same
+   partner (except rows you tagged by hand) and remembers it for next time.
+   Rules match whole words: a "SHELL" rule tags "SHELL 1234" but not
+   "SHELLFISH BAR".
 
-## The three tabs
+## The four tabs
 
 - Overview — the insights:
   - Headline numbers: average income, spend, net, and the minimum per month.
@@ -44,12 +47,26 @@ block when you open the file directly with `file://`.)
   - Top single expenses: your biggest one-off payments. Click one to find it
     in Transactions.
   - Where to cut: your biggest optional costs per month.
+- Budget — am I on track this month?
+  - Pick a month (defaults to the latest). A donut shows where the money went,
+    with the percent of the total budget spent in the middle.
+  - By category: one bar per category, filled to the percent of its budget
+    spent. Bars past full turn red. Essentials are listed first.
+  - The month's transactions, sortable by any column (read-only — tag them in
+    Transactions).
+  - The budget comes from your Budget plan on Overview: the total is the
+    "You can spend" cap. Essentials keep their typical-month figure, fixed
+    overrides stay as you set them, and the other optional categories share
+    what is left in proportion to their usual spend.
+  - Without a plan (no cash or target set), each category's budget is its
+    typical-month figure (or the yearly cost / 12 for annual categories, or your override from Categories).
 - Categories — the controls:
   - Toggle Essential and Annual per category, or set a fixed monthly override.
   - Ignore drops a category from all spending totals (default on for Savings),
     so transfers to yourself do not count as spending.
   - Auto-tag rules: view, edit, or delete the rules the app learned.
-- Transactions — the full list, filter, search, and fast tagging.
+- Transactions — the full list, most recent first, with filter, search, and
+  fast tagging.
 
 ## Keep your work safe
 
@@ -77,7 +94,9 @@ browser). This protects the time you spend tagging.
 - `js/analysis.js` — the month-by-category matrix, top expenses, recurring detection
 - `js/forecast.js` — the month-by-month cash projection
 - `js/dashboard.js` — the Overview and Categories views
+- `js/budget-view.js` — the Budget tab (month vs budget)
 - `js/transactions.js` — the transaction list and tagging
+- `js/dom.js` — small DOM and money-formatting helpers
 - `js/store.js` — saves everything in the browser
 - `js/main.js` — wires it together
 

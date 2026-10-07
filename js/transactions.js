@@ -11,7 +11,7 @@ export function renderTransactions(root, transactions, filters, settings, cb) {
   const count = el('span', { class: 'muted count' });
 
   function draw() {
-    const filtered = applyFilters(transactions, filters);
+    const filtered = byDateDesc(applyFilters(transactions, filters));
     listWrap.replaceChildren(txTable(filtered, cb));
     count.textContent = `${filtered.length} shown · ${transactions.length} total`;
   }
@@ -78,6 +78,13 @@ function applyFilters(transactions, f) {
     }
     return true;
   });
+}
+
+// Most recent first. Dates are ISO (YYYY-MM-DD), so string order is date order.
+// Same-day rows keep their import order (sort is stable).
+function txDate(t) { return t.bookingDate || t.valueDate || ''; }
+function byDateDesc(rows) {
+  return rows.slice().sort((a, b) => (txDate(a) < txDate(b) ? 1 : txDate(a) > txDate(b) ? -1 : 0));
 }
 
 function txTable(rows, cb) {

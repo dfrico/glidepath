@@ -3,7 +3,9 @@
 //
 // Outlier months (e.g. your wedding month) can be excluded from the averages.
 // They stay in the transaction list, but do not skew the "typical month" figures.
-// Annual categories are always spread as total / 12, regardless of exclusions.
+// Annual categories are spread as a yearly cost: total / months of data, with at
+// least 12 months, so 18 months holding two yearly bills still gives one bill / 12.
+// Exclusions do not apply to them.
 
 import { CATEGORIES } from './categories.js';
 
@@ -71,7 +73,7 @@ export function computeBudget(transactions, catSettings, settings) {
   for (const c of CATEGORIES) {
     const s = catSettings[c.name];
     const agg = cats[c.name];
-    const monthly = monthlyBudget(agg, s, includedCount);
+    const monthly = monthlyBudget(agg, s, includedCount, months.length);
     rows.push({
       name: c.name,
       total: agg.total,
@@ -151,8 +153,35 @@ export function computeBudget(transactions, catSettings, settings) {
   };
 }
 
-function monthlyBudget(agg, s, includedCount) {
+function monthlyBudget(agg, s, includedCount, monthsOfData) {
   if (s.budgetOverride != null) return s.budgetOverride;
-  if (s.annual) return agg.total / 12; // yearly cost, spread evenly
+  if (s.annual) return agg.total / Math.max(monthsOfData, 12); // yearly cost, spread evenly
   return agg.included / includedCount; // typical month
+}
+
+// Per-category monthly budgets for tracking a month (the Budget tab).
+// With a budget plan, the total is the plan's cap ("you can spend X / mo"):
+// essentials keep their figure, fixed overrides are kept as set, and the rest
+// of the optional categories share what is left, in proportion to their typical
+// spend. If essentials alone exceed the cap, optional budgets drop to zero.
+// Without a plan, each category's budget is simply its typical-month figure.
+export function categoryBudgets(b) {
+  const out = {};
+  for (const c of b.categories) out[c.name] = c.monthly;
+  if (!b.plan) return { byName: out, fromPlan: false, scale: 1 };
+
+  let fixedOptional = 0;
+  let autoOptional = 0;
+  for (const c of b.categories) {
+    if (c.ignore || c.essential) continue;
+    if (c.override != null) fixedOptional += c.monthly;
+    else autoOptional += c.monthly;
+  }
+  const room = b.plan.optionalRoom - fixedOptional;
+  const scale = autoOptional > 0 ? Math.max(0, room / autoOptional) : 0;
+  for (const c of b.categories) {
+    if (c.ignore || c.essential || c.override != null) continue;
+    out[c.name] = c.monthly * scale;
+  }
+  return { byName: out, fromPlan: true, scale };
 }

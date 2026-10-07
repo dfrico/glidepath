@@ -85,9 +85,11 @@ function onTag(id, category) {
     t.manual = true;
     if (state.settings.learn) {
       upsertRule(t, category);
+      // Also fixes rows from the same partner that a rule tagged wrongly.
+      // Rows you tagged by hand are left alone.
       const partner = (t.partnerName || '').toUpperCase();
       for (const o of state.transactions) {
-        if (o.manual || o.category) continue;
+        if (o.manual) continue;
         if ((o.partnerName || '').toUpperCase() === partner) o.category = category;
       }
     }
@@ -111,6 +113,7 @@ function updateCat(name, patch) {
   state.catSettings[name] = { ...state.catSettings[name], ...patch };
   store.saveCategorySettings(state.catSettings);
   renderOverviewPanel();
+  renderBudgetPanel();
   renderCategoriesPanel();
 }
 
@@ -131,15 +134,16 @@ const dashCb = {
   onAnnual: (name, v) => updateCat(name, { annual: v }),
   onIgnore: (name, v) => updateCat(name, { ignore: v }),
   onOverride: (name, v) => updateCat(name, { budgetOverride: v }),
-  onCash: (v) => { updateSettings({ cash: v }); renderOverviewPanel(); },
-  onTarget: (v) => { updateSettings({ targetMonths: v }); renderOverviewPanel(); },
-  onFutureIncome: (v) => { updateSettings({ futureIncome: v }); renderOverviewPanel(); },
-  onIncomeMonths: (v) => { updateSettings({ futureIncomeMonths: v }); renderOverviewPanel(); },
+  onCash: (v) => { updateSettings({ cash: v }); renderPlanPanels(); },
+  onTarget: (v) => { updateSettings({ targetMonths: v }); renderPlanPanels(); },
+  onFutureIncome: (v) => { updateSettings({ futureIncome: v }); renderPlanPanels(); },
+  onIncomeMonths: (v) => { updateSettings({ futureIncomeMonths: v }); renderPlanPanels(); },
   onMonthInclude: (m, include) => {
     const set = new Set(state.settings.excludedMonths);
     if (include) set.delete(m); else set.add(m);
     updateSettings({ excludedMonths: [...set] });
     renderOverviewPanel();
+    renderBudgetPanel();
     renderCategoriesPanel();
   },
   onRuleChange: (idx, category) => { if (state.rules[idx]) { state.rules[idx].category = category; afterRulesChange(); } },
@@ -254,6 +258,12 @@ function renderOverviewPanel() {
 function renderBudgetPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
   renderBudget(dom.budget, state.transactions, budget, state.settings, state.budgetSort, dashCb);
+}
+
+// The plan inputs live on Overview but set the Budget tab's cap too.
+function renderPlanPanels() {
+  renderOverviewPanel();
+  renderBudgetPanel();
 }
 
 function renderCategoriesPanel() {

@@ -282,7 +282,8 @@ function renderTransactionsPanel() {
 
 function renderAll() {
   const has = state.transactions.length > 0;
-  dom.empty.hidden = has;
+  dom.empty.hidden = has; // with data, showTab decides (Transactions only)
+  dom.empty.classList.toggle('compact', has);
   dom.tabs.hidden = !has;
   if (!has) {
     dom.overview.hidden = true;
@@ -311,6 +312,8 @@ function showTab(name) {
   dom.budget.hidden = name !== 'budget';
   dom.categories.hidden = name !== 'categories';
   dom.transactions.hidden = name !== 'transactions';
+  // The drop box: always on the start screen, otherwise only on Transactions.
+  dom.empty.hidden = state.transactions.length > 0 && name !== 'transactions';
   if (name === 'transactions') renderTransactionsPanel();
 }
 

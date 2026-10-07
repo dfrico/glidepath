@@ -90,8 +90,13 @@ browser). This protects the time you spend tagging.
 ## Key numbers
 
 - Minimum / month = sum of essential categories. This is your runway base.
-- Runway at essentials only = cash on hand ÷ minimum monthly.
-- Runway at current spend = cash on hand ÷ average monthly spend.
+- Runway at essentials only = months your cash lasts at the minimum monthly,
+  counting your expected income for as long as it comes (same maths as the
+  cash forecast).
+- Runway at current spend = the same, at your typical monthly spend (the one
+  the plan's verdict uses; ignored categories like Savings left out).
+- Avg income / spend / month = historical averages from your data. Ignored
+  categories (Savings transfers in and out, One-off) are left out.
 - Budget plan cap = cash on hand ÷ target months. Room for optional = cap minus
   essentials.
 - Annual categories = what you paid in the last 12 months of data ÷ 12.

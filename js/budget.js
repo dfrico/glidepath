@@ -94,20 +94,29 @@ export function computeBudget(transactions, catSettings, settings) {
   const untaggedMonthly = untaggedIncluded / includedCount;
   const plannedMonthly = runway + optionalMonthly + untaggedMonthly;
 
-  // Income and spend averages over included months only.
+  // Historical income and spend averages over included months only.
+  // Ignored categories are moves, not spend or earnings: transfers to savings
+  // (and back from it), one-offs. Rows tagged Income always count as income.
   let incIncome = 0;
   let incExpense = 0;
   for (const t of transactions) {
     if (excluded.has(monthKey(t))) continue;
+    const cat = t.category || '';
+    if (cat && cat !== 'Income' && catSettings[cat]?.ignore) continue;
     if (t.amount < 0) incExpense += -t.amount;
     else incIncome += t.amount;
   }
   const avgIncome = incIncome / includedCount;
   const avgSpend = incExpense / includedCount;
 
+  // How long the cash lasts, counting the expected income for as long as it
+  // comes. Same inputs as the cash forecast, so the two always agree.
+  // "Current spend" is the typical month the plan's verdict uses.
   const cash = settings.cash;
-  const runwayMonths = cash != null && runway > 0 ? cash / runway : null;
-  const burnMonths = cash != null && avgSpend > 0 ? cash / avgSpend : null;
+  const income = settings.futureIncome || 0;
+  const incomeMonths = settings.futureIncomeMonths; // null = ongoing
+  const runwayMonths = cash != null && runway > 0 ? monthsUntilEmpty(cash, income, incomeMonths, runway) : null;
+  const burnMonths = cash != null && plannedMonthly > 0 ? monthsUntilEmpty(cash, income, incomeMonths, plannedMonthly) : null;
 
   // Target-based plan: "to make my cash last N months, what can I spend?"
   // Expected income adds to the pot, but only for the months it actually arrives
@@ -155,7 +164,23 @@ export function computeBudget(transactions, catSettings, settings) {
   };
 }
 
-function monthlyBudget(agg, s, includedCount, monthsOfData) {
+// Months until the balance hits zero, with fractions ("3.5 months").
+// Infinity if income covers the burn for good.
+export function monthsUntilEmpty(cash, income, incomeMonths, burn, cap = 1200) {
+  let balance = cash;
+  for (let i = 1; i <= cap; i++) {
+    const net = burn - (incomeMonths == null || i <= incomeMonths ? income : 0);
+    if (net <= 0) {
+      if (incomeMonths == null) return Infinity; // income covers it forever
+      continue;
+    }
+    if (balance <= net) return i - 1 + balance / net;
+    balance -= net;
+  }
+  return Infinity;
+}
+
+function monthlyBudget(agg, s, includedCount) {
   if (s.budgetOverride != null) return s.budgetOverride;
   if (s.annual) return agg.last12 / 12; // yearly cost, spread evenly
   return agg.included / includedCount; // typical month

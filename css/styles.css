@@ -48,7 +48,8 @@ body {
 }
 .brand { font-weight: 700; font-size: 17px; }
 .range { flex: 1; font-size: 13px; }
-.actions { display: flex; gap: 8px; }
+.actions { display: flex; gap: 8px; align-items: center; }
+.mode-pick { display: flex; align-items: center; gap: 6px; margin-right: 8px; font-size: 13px; }
 
 .btn {
   background: var(--accent);

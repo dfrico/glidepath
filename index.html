@@ -11,6 +11,13 @@
     <div class="brand">Expense budget</div>
     <div class="range muted" id="range"></div>
     <div class="actions">
+      <label class="mode-pick" id="modePick" hidden>
+        <span class="muted">Mode</span>
+        <select id="modeSel" title="What are you using the app for?">
+          <option value="budget">Budget</option>
+          <option value="runway">Runway</option>
+        </select>
+      </label>
       <button id="importBtn" class="btn">Import CSV</button>
       <button id="backupBtn" class="btn ghost">Backup</button>
       <button id="restoreBtn" class="btn ghost">Restore</button>

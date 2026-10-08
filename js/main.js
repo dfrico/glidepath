@@ -30,6 +30,8 @@ const dom = {
   fileInput: document.getElementById('fileInput'),
   jsonInput: document.getElementById('jsonInput'),
   dropzone: document.getElementById('dropzone'),
+  modePick: document.getElementById('modePick'),
+  modeSel: document.getElementById('modeSel'),
 };
 
 // ---- Import ---------------------------------------------------------------
@@ -237,7 +239,7 @@ function restore(file) {
 // ---- Rendering ------------------------------------------------------------
 
 function buildForecast(budget) {
-  if (state.settings.cash == null) return null;
+  if (state.settings.mode !== 'runway' || state.settings.cash == null) return null;
   const months = [...new Set(state.transactions.map(monthKey).filter(Boolean))].sort();
   if (!months.length) return null;
   const startYm = addMonths(months[months.length - 1], 1);
@@ -286,6 +288,8 @@ function renderAll() {
   dom.empty.hidden = has; // with data, showTab decides (Transactions only)
   dom.empty.classList.toggle('compact', has);
   dom.tabs.hidden = !has;
+  dom.modePick.hidden = !has;
+  dom.modeSel.value = state.settings.mode;
   if (!has) {
     dom.overview.hidden = true;
     dom.budget.hidden = true;
@@ -336,6 +340,13 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   state.rules = store.loadRules();
   state.catSettings = store.loadCategorySettings();
   state.settings = store.loadSettings();
+  renderAll();
+});
+
+// The mode decides which Overview cards show and whether there is a plan.
+// Plan inputs are kept when switching, so going back restores them.
+dom.modeSel.addEventListener('change', () => {
+  updateSettings({ mode: dom.modeSel.value });
   renderAll();
 });
 

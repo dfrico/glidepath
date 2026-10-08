@@ -121,9 +121,10 @@ export function computeBudget(transactions, catSettings, settings) {
   // Target-based plan: "to make my cash last N months, what can I spend?"
   // Expected income adds to the pot, but only for the months it actually arrives
   // and only within the target horizon (income past the target does not help here).
+  // Only in runway mode: in budget mode the Budget tab tracks typical months.
   const targetMonths = settings.targetMonths;
   let plan = null;
-  if (cash != null && targetMonths > 0) {
+  if (settings.mode === 'runway' && cash != null && targetMonths > 0) {
     const income = settings.futureIncome || 0;
     const incomeMonthsRaw = settings.futureIncomeMonths; // null = ongoing
     const incomeMonths = incomeMonthsRaw == null ? targetMonths : Math.min(incomeMonthsRaw, targetMonths);

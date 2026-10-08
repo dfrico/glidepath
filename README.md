@@ -27,16 +27,27 @@ block when you open the file directly with `file://`.)
    Rules match whole words: a "SHELL" rule tags "SHELL 1234" but not
    "SHELLFISH BAR".
 
+## Modes
+
+Pick a mode in the top bar. It decides what Overview shows and where the
+Budget tab's numbers come from. Your inputs are kept when you switch.
+
+- Budget (default) — keep spending on track. The Budget tab compares each
+  month against your typical month per category (or your overrides). No cash
+  or runway inputs.
+- Runway — make your cash last. Adds the Budget plan and Cash forecast to
+  Overview, and the Budget tab uses the plan's monthly cap.
+
 ## The four tabs
 
 - Overview — the insights:
   - Headline numbers: average income, spend, net, and the minimum per month.
-  - Budget plan: enter your cash, how many months you want it to last, and any
+  - Budget plan (Runway mode): enter your cash, how many months you want it to last, and any
     expected income (e.g. unemployment benefit) and how many months it lasts.
     It gives you a monthly spending cap that counts that income, your essentials
     floor, the room left for optional spend, and a clear verdict (within budget,
     or cut €X per month). Income past the target horizon does not raise the cap.
-  - Cash forecast: uses the same cash and income figures from the budget plan.
+  - Cash forecast (Runway mode): uses the same cash and income figures from the budget plan.
     It projects your balance month by month and shows the exact month you run
     out, for two scenarios — essentials only and your current plan. It updates
     as you toggle categories, so cuts turn into months.

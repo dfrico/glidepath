@@ -35,6 +35,9 @@ export function saveCategorySettings(v) { write(K.cats, v); }
 export function loadSettings() {
   const s = read(K.settings, {});
   return {
+    // 'budget' (track spend vs budget) or 'runway' (make cash last N months).
+    // Users from before modes existed who set their cash keep runway.
+    mode: s.mode ?? (s.cash != null ? 'runway' : 'budget'),
     learn: s.learn ?? true,
     cash: s.cash ?? null,
     targetMonths: s.targetMonths ?? null,

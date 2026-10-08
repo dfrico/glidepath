@@ -23,6 +23,9 @@ No build, no dependencies, no tests — verify changes in the browser.
   them up automatically). Category list and defaults: `js/categories.js`.
 - Dates are ISO strings (`YYYY-MM-DD`); months are `YYYY-MM` via `monthKey()`.
   Expenses are negative amounts.
+- `settings.mode` ('budget' | 'runway') decides which Overview cards show and
+  whether `computeBudget` builds a plan at all (runway only). Code that uses
+  the plan must handle `plan === null`.
 - Semantics to respect everywhere: excluded months stay out of averages;
   `annual` categories are (paid in last 12 months of data) / 12; `ignore` categories (Savings, Income,
   One-off) are not spending; `budgetOverride` replaces the computed monthly.

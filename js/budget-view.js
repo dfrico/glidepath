@@ -88,7 +88,7 @@ export function renderBudget(root, transactions, budget, settings, sort, cb) {
 
   root.replaceChildren(
     header(months, month, cb),
-    summaryCard(data, budget.plan),
+    summaryCard(data, budget.plan, settings.mode),
     breakdownCard(data),
     yearly.length ? yearlyCard(yearly, data) : null,
     txCard(data, sort, cb),
@@ -110,7 +110,7 @@ function header(months, month, cb) {
 }
 
 // Donut of where the money went, with the month's spend vs budget in the hole.
-function summaryCard(d, plan) {
+function summaryCard(d, plan, mode) {
   const overall = d.totalBudget > 0 ? d.totalSpent / d.totalBudget : 0;
   const pctText = d.totalBudget > 0 ? Math.round(overall * 100) + '%' : '—';
   const cls = overall > 1 ? 'neg' : 'pos';
@@ -131,7 +131,7 @@ function summaryCard(d, plan) {
 
   return el('div', { class: 'card' }, [
     el('h3', { text: `Spend vs budget · ${monthLabel(d.month)}` }),
-    budgetSource(plan, d.totalBudget),
+    budgetSource(plan, d.totalBudget, mode),
     el('div', { class: 'donut-wrap' }, [
       el('div', { class: 'donut', html: donutSvg(withSpend, d.totalSpent, pctText, cls) }),
       legend,
@@ -143,9 +143,12 @@ function summaryCard(d, plan) {
 }
 
 // Where the budget number comes from, so it matches the Overview plan.
-function budgetSource(plan, totalBudget) {
+function budgetSource(plan, totalBudget, mode) {
   if (!plan) {
-    return el('p', { class: 'muted small', text: 'Budget = your typical month per category. Set cash and a target in Overview → Budget plan to budget against that cap instead.' });
+    const text = mode === 'runway'
+      ? 'Budget = your typical month per category. Set cash and a target in Overview → Budget plan to budget against that cap instead.'
+      : 'Budget = your typical month per category, or your fixed override from Categories.';
+    return el('p', { class: 'muted small', text });
   }
   const text = totalBudget > plan.allowedMonthly + 0.5
     ? `Budget plan: ${eur.format(plan.allowedMonthly)} / mo to last ${plan.targetMonths} months — but essentials alone are ${eur.format(plan.essentials)}, so optional categories get nothing.`

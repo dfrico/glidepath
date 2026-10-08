@@ -15,9 +15,11 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 export function renderOverview(root, b, matrix, tops, recurring, forecast, settings, cb) {
   const parts = [];
   if (b.untaggedCount > 0) parts.push(untaggedBanner(b, cb));
-  parts.push(kpis(b));
-  parts.push(planCard(b, settings, cb));
-  parts.push(forecastCard(forecast, settings, cb));
+  parts.push(kpis(b, settings.mode));
+  if (settings.mode === 'runway') {
+    parts.push(planCard(b, settings, cb));
+    parts.push(forecastCard(forecast, settings, cb));
+  }
   parts.push(matrixCard(matrix, cb));
   const skipped = ignoredNote(b);
   const rec = recurringCard(recurring, skipped);
@@ -57,13 +59,13 @@ function kpi(label, value, sub, cls) {
   ]);
 }
 
-function kpis(b) {
+function kpis(b, mode) {
   const net = b.avgIncome - b.avgSpend;
   return el('div', { class: 'kpis' }, [
     kpi('Avg income / month', eur.format(b.avgIncome)),
     kpi('Avg spend / month', eur.format(b.avgSpend)),
     kpi('Avg net / month', eur.format(net), net < 0 ? 'you spend more than you earn' : 'in the black', net < 0 ? 'neg' : 'pos'),
-    kpi('Minimum / month', eur.format(b.runway), 'essentials only — your runway base', 'accent'),
+    kpi('Minimum / month', eur.format(b.runway), mode === 'runway' ? 'essentials only — your runway base' : 'essentials only', 'accent'),
   ]);
 }
 

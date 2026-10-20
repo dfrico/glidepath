@@ -35,7 +35,8 @@ export function saveCategorySettings(v) { write(K.cats, v); }
 export function loadSettings() {
   const s = read(K.settings, {});
   return {
-    // 'budget' (track spend vs budget) or 'runway' (make cash last N months).
+    // 'budget' (track spend vs budget), 'runway' (make cash last N months),
+    // or 'fire' (grow investments toward financial independence).
     // Users from before modes existed who set their cash keep runway.
     mode: s.mode ?? (s.cash != null ? 'runway' : 'budget'),
     learn: s.learn ?? true,
@@ -45,6 +46,11 @@ export function loadSettings() {
     futureIncomeMonths: s.futureIncomeMonths ?? null,
     excludedMonths: s.excludedMonths ?? [],
     budgetMonth: s.budgetMonth ?? null,
+    // FIRE inputs. Separate from runway's cash: invested money, not cash on hand.
+    fireInvested: s.fireInvested ?? null,
+    fireContribution: s.fireContribution ?? null, // null = your historical avg net
+    fireReturn: s.fireReturn ?? 5, // %/yr, real (after inflation)
+    fireWithdrawal: s.fireWithdrawal ?? 4, // %/yr, the "4% rule"
   };
 }
 export function saveSettings(v) { write(K.settings, v); }

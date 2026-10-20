@@ -12,7 +12,7 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 
 // ---- Overview -------------------------------------------------------------
 
-export function renderOverview(root, b, matrix, tops, recurring, forecast, settings, cb) {
+export function renderOverview(root, b, matrix, tops, recurring, forecast, fire, settings, cb) {
   const parts = [];
   if (b.untaggedCount > 0) parts.push(untaggedBanner(b, cb));
   parts.push(kpis(b, settings.mode));
@@ -20,6 +20,7 @@ export function renderOverview(root, b, matrix, tops, recurring, forecast, setti
     parts.push(planCard(b, settings, cb));
     parts.push(forecastCard(forecast, settings, cb));
   }
+  if (settings.mode === 'fire' && fire) parts.push(fireCard(fire, b, settings, cb));
   parts.push(matrixCard(matrix, cb));
   const skipped = ignoredNote(b);
   const rec = recurringCard(recurring, skipped);
@@ -61,10 +62,14 @@ function kpi(label, value, sub, cls) {
 
 function kpis(b, mode) {
   const net = b.avgIncome - b.avgSpend;
+  // FIRE cares about the share of income kept, so it replaces the net tile.
+  const third = mode === 'fire'
+    ? kpi('Savings rate', b.avgIncome > 0 ? pct(net / b.avgIncome) : '—', `${eur.format(net)} / month kept`, net < 0 ? 'neg' : 'pos')
+    : kpi('Avg net / month', eur.format(net), net < 0 ? 'you spend more than you earn' : 'in the black', net < 0 ? 'neg' : 'pos');
   return el('div', { class: 'kpis' }, [
     kpi('Avg income / month', eur.format(b.avgIncome)),
     kpi('Avg spend / month', eur.format(b.avgSpend)),
-    kpi('Avg net / month', eur.format(net), net < 0 ? 'you spend more than you earn' : 'in the black', net < 0 ? 'neg' : 'pos'),
+    third,
     kpi('Minimum / month', eur.format(b.runway), mode === 'runway' ? 'essentials only — your runway base' : 'essentials only', 'accent'),
   ]);
 }
@@ -220,6 +225,91 @@ function forecastTable(proj) {
     el('summary', { text: 'Month-by-month (essentials plan)' }),
     table(['Month', 'Income', 'Spend', 'Balance'], rows),
   ]);
+}
+
+// ---- FIRE -----------------------------------------------------------------
+
+const HUE_GROW = '#3fbf7f'; // portfolio line
+const HUE_FI = '#c9cdd6'; // full FI target line
+
+function pct(x) { return Math.round(x * 100) + '%'; }
+
+function fmtReach(r, cap) {
+  if (!r) return `not within ${cap / 12} years`;
+  if (r.i === 0) return 'reached now';
+  return `${monthLabel(r.ym)} · ${(r.i / 12).toFixed(1)} years`;
+}
+
+function fireCard(f, b, settings, cb) {
+  const num = (value, placeholder, onChange, attrs = {}) => {
+    const input = el('input', { type: 'number', class: 'num-input', placeholder, value: value ?? '', ...attrs });
+    input.addEventListener('change', () => onChange(input.value === '' ? null : parseFloat(input.value)));
+    return input;
+  };
+  const inputs = el('div', { class: 'plan-inputs' }, [
+    el('label', {}, ['Invested (€)', num(settings.fireInvested, 'e.g. 20000', (v) => cb.onFire({ fireInvested: v }), { min: '0' })]),
+    el('label', {}, ['Add (€/mo)', num(settings.fireContribution, Math.round(f.autoContribution), (v) => cb.onFire({ fireContribution: v }), { min: '0' })]),
+    el('label', { title: 'Expected yearly return after inflation, so targets stay in today’s euros' }, ['Real return (%/yr)', num(settings.fireReturn, '5', (v) => cb.onFire({ fireReturn: v ?? 5 }), { step: '0.5' })]),
+    el('label', { title: 'Share of the portfolio you would spend each year. 4% means 25x your yearly spend.' }, ['Withdrawal (%)', num(settings.fireWithdrawal, '4', (v) => cb.onFire({ fireWithdrawal: v ?? 4 }), { min: '0.5', step: '0.25' })]),
+  ]);
+
+  const contribNote = settings.fireContribution == null
+    ? `Adding ${eur.format(f.contribution)} a month: your historical average net (income minus spend). Type a figure to override.`
+    : `Adding ${eur.format(f.contribution)} a month (your figure; clear it to use your historical average net of ${eur.format(f.autoContribution)}).`;
+
+  const stats = el('div', { class: 'plan-grid' }, [
+    planStat('Lean FI', eur.format(f.leanTarget), fmtReach(f.proj.reach.lean, f.proj.cap), f.proj.reach.lean ? 'pos' : ''),
+    planStat('FI', eur.format(f.fullTarget), fmtReach(f.proj.reach.fi, f.proj.cap), f.proj.reach.fi ? 'pos' : ''),
+    planStat('Starting from', eur.format(f.invested), `from ${monthLabel(f.startYm)}, ${settings.fireReturn}%/yr real`),
+  ]);
+
+  return el('div', { class: 'card' }, [
+    el('h3', { text: 'FIRE plan' }),
+    el('p', { class: 'muted', text: `Lean FI covers your essentials (${eur.format(b.runway)}/mo); FI covers your typical spend (${eur.format(b.plannedMonthly)}/mo). Each target is the portfolio that pays that yearly spend at a ${settings.fireWithdrawal}% withdrawal rate.` }),
+    inputs,
+    el('p', { class: 'muted small', text: contribNote }),
+    stats,
+    fireChart(f),
+    el('p', { class: 'muted small', text: 'A projection from your own inputs, not financial advice. Returns are not guaranteed.' }),
+  ]);
+}
+
+function fireChart(f) {
+  const all = f.proj.points;
+  const fiAt = f.proj.reach.fi ? f.proj.reach.fi.i : all.length - 1;
+  const maxI = Math.max(Math.min(all.length - 1, fiAt + 24), 12); // a little past FI
+  const pts = all.slice(0, maxI + 1);
+  const yMax = Math.max(f.fullTarget, ...pts.map((p) => p.balance), 1) * 1.05;
+
+  const W = 760, H = 240, L = 70, R = 18, T = 16, Bm = 30;
+  const plotW = W - L - R, plotH = H - T - Bm;
+  const x = (i) => L + plotW * (i / maxI);
+  const y = (v) => T + plotH * (1 - v / yMax);
+  const line = pts.map((p) => `${x(p.i).toFixed(1)},${y(p.balance).toFixed(1)}`).join(' ');
+
+  const target = (amount, color, label) => `<line x1="${L}" y1="${y(amount).toFixed(1)}" x2="${W - R}" y2="${y(amount).toFixed(1)}" stroke="${color}" stroke-dasharray="5 4" stroke-width="1"/>`
+    + `<text x="${L - 8}" y="${(y(amount) + 4).toFixed(1)}" text-anchor="end" fill="${color}" font-size="11">${label}</text>`;
+  const mark = (r, amount, color) => r && r.i > 0
+    ? `<circle cx="${x(r.i).toFixed(1)}" cy="${y(amount).toFixed(1)}" r="4" fill="${color}"/><text x="${x(r.i).toFixed(1)}" y="${(y(amount) - 8).toFixed(1)}" text-anchor="middle" fill="${color}" font-size="11">${monthShort(r.ym)}</text>`
+    : '';
+
+  const yearsSpan = maxI / 12;
+  const stepYears = Math.max(1, Math.ceil(yearsSpan / 8));
+  let xticks = '';
+  for (let yr = 0; yr * 12 <= maxI; yr += stepYears) {
+    const i = yr * 12;
+    xticks += `<text x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle" fill="#898781" font-size="11">${yr === 0 ? 'now' : '+' + yr + 'y'}</text>`;
+  }
+  const hoverStep = Math.max(1, Math.round(maxI / 60));
+  const hover = pts.filter((p) => p.i % hoverStep === 0).map((p) => `<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.balance).toFixed(1)}" r="7" fill="transparent"><title>${monthLabel(p.ym)}: ${eur.format(p.balance)}</title></circle>`).join('');
+
+  const svg = `<svg viewBox="0 0 ${W} ${H}" class="fc-svg" role="img" aria-label="Portfolio growth toward financial independence">
+    ${target(f.fullTarget, HUE_FI, 'FI')}${target(f.leanTarget, HUE_ESS, 'Lean')}
+    <text x="${L - 8}" y="${(y(0) + 4).toFixed(1)}" text-anchor="end" fill="#898781" font-size="11">€0</text>
+    <polyline fill="none" stroke="${HUE_GROW}" stroke-width="2" points="${line}"/>
+    ${mark(f.proj.reach.lean, f.leanTarget, HUE_ESS)}${mark(f.proj.reach.fi, f.fullTarget, HUE_FI)}${xticks}${hover}
+  </svg>`;
+  return el('div', { class: 'fc-chart', html: svg });
 }
 
 // ---- Recurring commitments ------------------------------------------------

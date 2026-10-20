@@ -1,11 +1,13 @@
-# Expense budget — notes for Claude
+# Glidepath — notes for Claude
 
 ## What this is
-A local, in-browser **budget app**. The core question it answers is
-"am I on track with my budget?" — typical-month budgets per category, and this
-month's spend against them (Budget tab). Runway / cash forecast is a secondary
-mode for when the user has no income (e.g. unemployed). Bank data never leaves
-the browser.
+A local, in-browser **budget app** with three modes. Budget answers "am I on
+track with my budget?" — typical-month budgets per category, and this month's
+spend against them (Budget tab). Runway is a founder's runway: how long cash
+lasts while working solo on savings, and the monthly cap that makes it last.
+FIRE grows investments toward Lean FI and FI targets. Bank data never leaves
+the browser. Copy stays positive and forward-looking: founders, sabbaticals,
+independence; never "unemployed" or "no income".
 
 ## Run
 `python3 -m http.server 8137` from the repo root, open http://localhost:8137.
@@ -23,9 +25,12 @@ No build, no dependencies, no tests — verify changes in the browser.
   them up automatically). Category list and defaults: `js/categories.js`.
 - Dates are ISO strings (`YYYY-MM-DD`); months are `YYYY-MM` via `monthKey()`.
   Expenses are negative amounts.
-- `settings.mode` ('budget' | 'runway') decides which Overview cards show and
-  whether `computeBudget` builds a plan at all (runway only). Code that uses
-  the plan must handle `plan === null`.
+- `settings.mode` ('budget' | 'runway' | 'fire') decides which Overview cards
+  show and whether `computeBudget` builds a plan at all (runway only). Code that
+  uses the plan must handle `plan === null`. FIRE inputs (`fireInvested`,
+  `fireContribution`, `fireReturn`, `fireWithdrawal`) live in settings; the
+  projection is `projectGrowth` / `fiTarget` in `forecast.js`, built in
+  `buildFire` in `main.js`, and may be `null`.
 - Semantics to respect everywhere: excluded months stay out of averages;
   `annual` categories are (paid in last 12 months of data) / 12; `ignore` categories (Savings, Income,
   One-off) are not spending; `budgetOverride` replaces the computed monthly.

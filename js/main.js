@@ -5,7 +5,7 @@ import { parseCsv } from './parse.js';
 import { applyRules, autoTagAll, makeRuleFromTx } from './tagging.js';
 import { computeBudget, monthKey, addMonths } from './budget.js';
 import { monthMatrix, topExpenses, recurringCommitments } from './analysis.js';
-import { project } from './forecast.js';
+import { project, projectGrowth, fiTarget } from './forecast.js';
 import { renderOverview, renderCategories } from './dashboard.js';
 import { renderTransactions, smallestPeriodFor } from './transactions.js';
 import { renderBudget } from './budget-view.js';
@@ -140,6 +140,7 @@ const dashCb = {
   onTarget: (v) => { updateSettings({ targetMonths: v }); renderPlanPanels(); },
   onFutureIncome: (v) => { updateSettings({ futureIncome: v }); renderPlanPanels(); },
   onIncomeMonths: (v) => { updateSettings({ futureIncomeMonths: v }); renderPlanPanels(); },
+  onFire: (patch) => { updateSettings(patch); renderOverviewPanel(); },
   onMonthInclude: (m, include) => {
     const set = new Set(state.settings.excludedMonths);
     if (include) set.delete(m); else set.add(m);
@@ -252,6 +253,27 @@ function buildForecast(budget) {
   };
 }
 
+// FIRE: grow what is invested toward two targets, lean (essentials only) and
+// full (typical spend), each the portfolio that sustains that yearly spend.
+function buildFire(budget) {
+  if (state.settings.mode !== 'fire') return null;
+  const months = [...new Set(state.transactions.map(monthKey).filter(Boolean))].sort();
+  if (!months.length) return null;
+  const s = state.settings;
+  const startYm = addMonths(months[months.length - 1], 1);
+  const autoContribution = Math.max(0, budget.avgIncome - budget.avgSpend);
+  const contribution = s.fireContribution ?? autoContribution;
+  const invested = s.fireInvested || 0;
+  const withdrawal = s.fireWithdrawal > 0 ? s.fireWithdrawal : 4; // 0% would mean an infinite target
+  const leanTarget = fiTarget(budget.runway, withdrawal);
+  const fullTarget = fiTarget(budget.plannedMonthly, withdrawal);
+  const proj = projectGrowth(startYm, invested, contribution, s.fireReturn, [
+    { key: 'lean', amount: leanTarget },
+    { key: 'fi', amount: fullTarget },
+  ]);
+  return { startYm, invested, contribution, autoContribution, leanTarget, fullTarget, proj };
+}
+
 function renderOverviewPanel() {
   const budget = computeBudget(state.transactions, state.catSettings, state.settings);
   const matrix = monthMatrix(state.transactions, state.settings.excludedMonths);
@@ -260,7 +282,8 @@ function renderOverviewPanel() {
   const tops = topExpenses(state.transactions, 12, state.settings.excludedMonths, ignoredNames);
   const recurring = recurringCommitments(state.transactions, essentialNames, ignoredNames);
   const forecast = buildForecast(budget);
-  renderOverview(dom.overview, budget, matrix, tops, recurring, forecast, state.settings, dashCb);
+  const fire = buildFire(budget);
+  renderOverview(dom.overview, budget, matrix, tops, recurring, forecast, fire, state.settings, dashCb);
 }
 
 function renderBudgetPanel() {

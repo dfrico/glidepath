@@ -1,13 +1,14 @@
-# Expense budget
+# Glidepath
 
-A small local web app to budget your expenses and see whether you are on track.
-It also has a runway mode for when you have no income: how long will your cash last?
+A local web app to budget your expenses and see whether you are on track.
+It has three modes: **Budget** (am I on track this month?), **Runway** (a founder's
+runway: how long can I fund myself from savings while working solo?) and **FIRE**
+(when does my portfolio cover my spending?).
 It runs fully in your browser. Your bank data stays on your machine — nothing is uploaded.
 
 ## Run it
 
 ```
-cd expense-budget
 python3 -m http.server 8137
 ```
 
@@ -35,15 +36,18 @@ Budget tab's numbers come from. Your inputs are kept when you switch.
 - Budget (default) — keep spending on track. The Budget tab compares each
   month against your typical month per category (or your overrides). No cash
   or runway inputs.
-- Runway — make your cash last. Adds the Budget plan and Cash forecast to
-  Overview, and the Budget tab uses the plan's monthly cap.
+- Runway — a founder's runway: make your cash last while you work on your own
+  thing. Adds the Budget plan and Cash forecast to Overview, and the Budget tab
+  uses the plan's monthly cap.
+- FIRE — grow your investments toward financial independence. Adds the FIRE plan
+  to Overview and swaps the net tile for your savings rate.
 
 ## The four tabs
 
 - Overview — the insights:
   - Headline numbers: average income, spend, net, and the minimum per month.
   - Budget plan (Runway mode): enter your cash, how many months you want it to last, and any
-    expected income (e.g. unemployment benefit) and how many months it lasts.
+    expected income (e.g. freelance work, a severance, a part-time gig) and how many months it lasts.
     It gives you a monthly spending cap that counts that income, your essentials
     floor, the room left for optional spend, and a clear verdict (within budget,
     or cut €X per month). Income past the target horizon does not raise the cap.
@@ -51,6 +55,12 @@ Budget tab's numbers come from. Your inputs are kept when you switch.
     It projects your balance month by month and shows the exact month you run
     out, for two scenarios — essentials only and your current plan. It updates
     as you toggle categories, so cuts turn into months.
+  - FIRE plan (FIRE mode): enter what you have invested, what you add per month
+    (defaults to your historical average net), a real yearly return and a
+    withdrawal rate. It gives two targets — Lean FI (your essentials) and FI
+    (your typical spend), each the portfolio that pays that yearly spend at the
+    withdrawal rate — and a chart of your portfolio growing toward them, with
+    the month each one is reached.
   - Monthly breakdown: a category-by-month grid, shaded by amount, with an
     average-per-month column. Untick a month header (e.g. your wedding month)
     to keep it out of the averages.
@@ -112,6 +122,10 @@ browser). This protects the time you spend tagging.
 - Budget plan cap = cash on hand ÷ target months. Room for optional = cap minus
   essentials.
 - Annual categories = what you paid in the last 12 months of data ÷ 12.
+- Savings rate (FIRE mode) = average net ÷ average income.
+- FI target = yearly spend × 100 ÷ withdrawal rate (4% → 25× your yearly spend).
+  Lean FI uses essentials only; FI uses your typical spend. Returns are real
+  (after inflation), so targets stay in today's euros.
 
 ## Files
 
@@ -123,7 +137,7 @@ browser). This protects the time you spend tagging.
 - `js/tagging.js` — the auto-tag engine
 - `js/budget.js` — the budget, runway, and plan maths
 - `js/analysis.js` — the month-by-category matrix, top expenses, recurring detection
-- `js/forecast.js` — the month-by-month cash projection
+- `js/forecast.js` — the month-by-month cash projection and the FIRE growth projection
 - `js/dashboard.js` — the Overview and Categories views
 - `js/budget-view.js` — the Budget tab (month vs budget)
 - `js/transactions.js` — the transaction list and tagging

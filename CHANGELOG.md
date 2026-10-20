@@ -12,6 +12,8 @@ All notable changes to Glidepath are listed here. The format follows [Keep a Cha
 - CSV import with delimiter and number-format detection; auto-tagging with learned rules.
 - Monthly breakdown, recurring commitments, top expenses, where-to-cut.
 - Backup and restore to a JSON file.
+- Error notices instead of alerts: import, restore and storage failures explain what went wrong, with a "Report a bug" link. Uncaught errors are caught and reported the same way.
+- Footer with source and bug-report links.
 - MIT license.
 
 ### Changed

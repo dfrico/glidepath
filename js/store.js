@@ -2,6 +2,7 @@
 
 import { CATEGORIES } from './categories.js';
 import { STARTER_RULES } from './starter-rules.js';
+import { showError } from './notice.js';
 
 const K = {
   tx: 'eb.transactions',
@@ -77,12 +78,37 @@ export function importState(obj) {
   if (obj.settings) write(K.settings, obj.settings);
 }
 
+// A corrupt or unreadable entry falls back to the default so the app still
+// opens; the user is told, since tags or settings may be missing.
 function read(k, def) {
+  let v = null;
   try {
-    const v = localStorage.getItem(k);
-    return v == null ? def : JSON.parse(v);
+    v = localStorage.getItem(k);
   } catch {
+    warnOnce('read', 'Browser storage is not available, so nothing can be loaded or saved. Private mode or blocked site data are the usual causes.');
+    return def;
+  }
+  if (v == null) return def;
+  try {
+    return JSON.parse(v);
+  } catch {
+    showError('Saved data for this app looks damaged and was skipped.', 'Restore a backup if you have one. Entry: ' + k);
     return def;
   }
 }
-function write(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+// Quota or disabled storage: keep running on in-memory state, say so once.
+function write(k, v) {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch (e) {
+    warnOnce('write', 'Changes are not being saved: browser storage is full or disabled. Use Backup to keep your work.', e && e.message);
+  }
+}
+
+const warned = new Set();
+function warnOnce(key, message, detail) {
+  if (warned.has(key)) return;
+  warned.add(key);
+  showError(message, detail);
+}

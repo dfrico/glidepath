@@ -9,6 +9,9 @@ import { project, projectGrowth, fiTarget } from './forecast.js';
 import { renderOverview, renderCategories } from './dashboard.js';
 import { renderTransactions, smallestPeriodFor } from './transactions.js';
 import { renderBudget } from './budget-view.js';
+import { showError, showInfo, installGlobalHandlers } from './notice.js';
+
+installGlobalHandlers();
 
 const state = {
   transactions: store.loadTransactions(),
@@ -39,18 +42,26 @@ const dom = {
 function readFile(file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => importText(String(reader.result));
+  reader.onload = () => importText(String(reader.result), file.name);
+  reader.onerror = () => showError(`Could not read "${file.name}".`, reader.error && reader.error.message);
   reader.readAsText(file);
 }
 
-function importText(text) {
-  const { rows, error } = parseCsv(text);
-  if (error) { alert(error); return; }
-  if (!rows.length) { alert('No usable rows found in that file.'); return; }
+function importText(text, name) {
+  let parsed;
+  try {
+    parsed = parseCsv(text);
+  } catch (e) {
+    showError(`Could not parse "${name}". The file may not be a CSV export.`, e && e.message);
+    return;
+  }
+  const { rows, error } = parsed;
+  if (error) { showError(`Could not import "${name}". ${error}`); return; }
+  if (!rows.length) { showError(`No usable rows found in "${name}".`, 'Every row needs a date and an amount. Check the Supported bank exports section in the README.'); return; }
   const added = mergeRows(rows);
   store.saveTransactions(state.transactions);
   renderAll();
-  alert(`Imported ${rows.length} rows. ${added} new, ${rows.length - added} already known.`);
+  showInfo(`Imported ${rows.length} rows. ${added} new, ${rows.length - added} already known.`);
 }
 
 // Keep tags across re-imports. Duplicates within one file are kept separately.
@@ -229,11 +240,12 @@ function restore(file) {
       state.catSettings = store.loadCategorySettings();
       state.settings = store.loadSettings();
       renderAll();
-      alert(`Restored ${state.transactions.length} transactions.`);
+      showInfo(`Restored ${state.transactions.length} transactions.`);
     } catch (e) {
-      alert('Could not restore: ' + e.message);
+      showError('Could not restore that backup.', e && e.message);
     }
   };
+  reader.onerror = () => showError(`Could not read "${file.name}".`, reader.error && reader.error.message);
   reader.readAsText(file);
 }
 
